@@ -64,6 +64,12 @@ func Dial(address string, connectTimeout, readTimeout, writeTimeout time.Duratio
 	return NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive), nil
 }
 
+func (c *Conn) Close() {
+	if c.conn != nil {
+		c.Close()
+	}
+}
+
 // call redis command with request => response model
 func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	c.lastActiveTime = time.Now().Unix()
