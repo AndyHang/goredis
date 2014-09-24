@@ -1,5 +1,6 @@
 package msgredis
 
+// all return integer is int64
 import (
 	"errors"
 	"fmt"
@@ -49,4 +50,45 @@ func (c *Conn) Info() ([]byte, error) {
 	}
 	fmt.Println(string(r))
 	return r, nil
+}
+
+func (c *Conn) DEL(keys []string) (int64, error) {
+	args := make([]interface{}, len(keys))
+	for i := 0; i < len(keys); i++ {
+		args[i] = keys[i]
+	}
+	n, e := c.Call("DEL", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) SET(key, value string) {
+
+}
+
+func (c *Conn) SADD(key string, values []string) (int64, error) {
+	args := make([]interface{}, len(values)+1)
+	args[0] = key
+	for i := 0; i < len(values); i++ {
+		args[i+1] = values[i]
+	}
+	n, e := c.Call("SADD", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) SMEMBERS(key string) ([][]byte, error) {
+	v, e := c.Call("SMEMBERS", key)
+	if e != nil {
+		return nil, e
+	}
+	members := make([][]byte, len(v.([]interface{})))
+	for i, value := range v.([]interface{}) {
+		members[i] = value.([]byte)
+	}
+	return members, nil
 }

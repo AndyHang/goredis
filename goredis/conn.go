@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	ConnectTimeout    = 5e9
-	ReadTimeout       = 5e9
-	WriteTimeout      = 5e9
-	DefaultBufferSize = 64
+	ConnectTimeout     = 5e9
+	ReadTimeout        = 5e9
+	WriteTimeout       = 5e9
+	DefaultBufferSize  = 64
+	DefaultArgsBufSize = 10
 
 	TypeError        = '-'
 	TypeSimpleString = '+'
@@ -28,11 +29,13 @@ var (
 )
 
 type Conn struct {
+	pipeCount      int
+	multiCount     int
 	conn           *net.TCPConn
 	lastActiveTime int64
 	keepAlive      bool
 	buffer         []byte
-	bufPos         int
+	argsBuf        []interface{}
 	rb             *bufio.Reader
 	wb             *bufio.Writer
 	readTimeout    time.Duration
@@ -45,15 +48,18 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		lastActiveTime: time.Now().Unix(),
 		keepAlive:      keepAlive,
 		buffer:         make([]byte, DefaultBufferSize),
+		argsBuf:        make([]interface{}, DefaultArgsBufSize),
 		rb:             bufio.NewReader(conn),
 		wb:             bufio.NewWriter(conn),
-		readTimeout:    readTimeout,
-		writeTimeout:   writeTimeout,
+		// rb:           bufio.NewReaderSize(conn, 16),
+		// wb:           bufio.NewWriterSize(conn, 16),
+		readTimeout:  readTimeout,
+		writeTimeout: writeTimeout,
 	}
 }
 
 // connect with timeout
-func Dial(address string, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool) (*Conn, error) {
+func Dial(address, password string, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool) (*Conn, error) {
 	c, e := net.DialTimeout("tcp", address, connectTimeout)
 	if e != nil {
 		return nil, e
@@ -61,7 +67,14 @@ func Dial(address string, connectTimeout, readTimeout, writeTimeout time.Duratio
 	if _, ok := c.(*net.TCPConn); !ok {
 		return nil, errors.New("invalid tcp conn")
 	}
-	return NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive), nil
+
+	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive)
+	if password != "" {
+		if _, e := conn.AUTH(password); e != nil {
+			return nil, e
+		}
+	}
+	return conn, nil
 }
 
 func (c *Conn) Close() {
@@ -83,6 +96,10 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 		return nil, e
 	}
 
+	if e = c.wb.Flush(); e != nil {
+		return nil, e
+	}
+
 	if c.readTimeout > 0 {
 		if e = c.conn.SetReadDeadline(time.Now().Add(c.writeTimeout)); e != nil {
 			return nil, e
@@ -92,7 +109,6 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	if e != nil {
 		return nil, e
 	}
-	fmt.Println(response)
 	return response, e
 }
 
@@ -135,8 +151,6 @@ func (c *Conn) writeRequest(command string, args []interface{}) error {
 			e = c.writeString(fmt.Sprintf("%v", data))
 		}
 	}
-	e = c.wb.Flush()
-
 	return e
 }
 
@@ -214,7 +228,7 @@ func (c *Conn) readResponse() (interface{}, error) {
 	case TypeIntegers:
 		return strconv.ParseInt(string(p), 10, 64)
 	case TypeSimpleString:
-		return string(p), nil
+		return p, nil
 	case TypeBulkString:
 		return c.parseBulkString(p)
 	case TypeArrays:
@@ -280,4 +294,64 @@ func (c *Conn) parseArray(p []byte) ([]interface{}, error) {
 		}
 	}
 	return result, nil
+}
+
+// pipeline
+func (c *Conn) PipeSend(command string, args ...interface{}) error {
+	c.pipeCount++
+	return c.writeRequest(command, args)
+}
+
+func (c *Conn) PipeExec() ([]interface{}, error) {
+	var e error
+	if e = c.wb.Flush(); e != nil {
+		return nil, e
+	}
+	n := c.pipeCount
+	ret := make([]interface{}, c.pipeCount)
+	c.pipeCount = 0
+	for i := 0; i < n; i++ {
+		ret[i], e = c.readResponse()
+	}
+	return ret, e
+}
+
+// Transactions
+func (c *Conn) MULTI() error {
+	ret, e := c.Call("MULTI")
+	if e != nil {
+		return e
+	}
+	if _, ok := ret.([]byte); !ok {
+		return errors.New("invalid return type")
+	}
+	r := ret.([]byte)
+	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
+		return nil
+	}
+	return errors.New("invalid return:" + string(r))
+}
+
+func (c *Conn) TransSend(command string, args ...interface{}) error {
+	c.multiCount++
+	ret, e := c.Call(command, args...)
+	if e != nil {
+		return e
+	}
+	if _, ok := ret.([]byte); !ok {
+		return errors.New("invalid return type")
+	}
+	r := ret.([]byte)
+	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
+		return nil
+	}
+	return errors.New("invalid return:" + string(r))
+}
+
+func (c *Conn) TransExec() ([]interface{}, error) {
+	r, e := c.Call("EXEC")
+	if e = c.wb.Flush(); e != nil {
+		return nil, e
+	}
+	return r.([]interface{}), e
 }

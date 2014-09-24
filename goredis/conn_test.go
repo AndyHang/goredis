@@ -1,51 +1,81 @@
 package msgredis
 
 import (
+	"fmt"
 	"testing"
 )
 
-// func TestConn(t *testing.T) {
-// 	c, e := Dial("10.16.15.121:9731", ConnectTimeout, ReadTimeout, WriteTimeout, false)
-// 	if e != nil {
-// 		println(e.Error())
-// 		return
-// 	}
-// 	defer c.conn.Close()
-// 	command := []byte{'P', 'I', 'N', 'G', '\r', '\n'}
-// 	n, e := c.conn.Write(command)
-// 	if e != nil {
-// 		println(e.Error())
-// 		return
-// 	}
-// 	println(n)
+func ATestMultiPool(t *testing.T) {
+	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991@1234567980"}
+	addr := "10.16.15.121:9731"
+	mp := NewMultiPool(addresses)
 
-// 	response := make([]byte, 10)
-// 	n, e = c.conn.Read(response)
-// 	if e != nil {
-// 		println(e.Error())
-// 		return
-// 	}
-// 	println(n, string(response))
-// }
+	c := mp.PopByAddr(addr)
+	if c == nil {
+		fmt.Println("c == nil")
+		return
+	}
+	c.Info()
+	mp.PushByAddr(addr, c)
+}
 
-// func TestDiv(t *testing.T) {
-// 	p := []byte{'a', 'b'}
-// 	t.Error(p[1:0])
-// }
+func ATestPoolNoAuth(t *testing.T) {
+	p := NewPool("10.16.15.121:9731", "")
+	connSlice := make([]*Conn, 0, 25)
+	for i := 0; i < 5; i++ {
+		fmt.Println("Active=", p.Actives())
+		fmt.Println("Idles=", p.Idles())
+		c := p.Pop()
+		connSlice = append(connSlice, c)
+	}
+
+	fmt.Println("Conn slice len:", len(connSlice))
+	for _, c := range connSlice {
+		fmt.Println("Active=", p.Actives())
+		fmt.Println("Idles=", p.Idles())
+		p.Push(c)
+	}
+}
+
+func ATestPoolAuth(t *testing.T) {
+	p := NewPool("10.16.15.121:9991", "1234567890")
+	fmt.Println(p.Actives())
+	fmt.Println(p.Idles())
+	c := p.Pop()
+	if c == nil {
+		fmt.Println("Pop nil")
+		return
+	}
+	defer p.Push(c)
+	// fmt.Println(c.Info())
+	fmt.Println(c.Call("SET", "zyh0924", "abcdefghijklmnopqrstuvwxyz"))
+	fmt.Println(c.Call("GET", "zyh0924"))
+}
 
 func TestWrite(t *testing.T) {
-	c, e := Dial("10.16.15.121:9731", ConnectTimeout, ReadTimeout, WriteTimeout, false)
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false)
 	if e != nil {
 		println(e.Error())
 		return
 	}
 	defer c.conn.Close()
 
-	c.Call("set", "zyh0922", "zyh0922")
-	c.Call("get", "zyh0922")
-	c.Call("del", "zyh0922")
-	c.Call("sadd", "zyh0922", "aaaaaa", "bbbbbbb", "ccccccccc")
-	c.Call("smembers", "zyh0922")
-	c.Call("smembers", "sadd")
-	c.Call("del", "zyh0922")
+	// test commands
+	key := "zyh0924"
+	args := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}
+	fmt.Println(c.SADD(key, args))
+	fmt.Println(c.SMEMBERS(key))
+	fmt.Println(c.DEL([]string{key}))
+
+	// test pipeline
+	c.PipeSend("SET", "a", "zyh")
+	c.PipeSend("SET", "b", "zyh")
+	c.PipeSend("SET", "c", "zyh")
+	fmt.Println(c.PipeExec())
+
+	// test transaction
+	c.MULTI()
+	c.TransSend("SET", "a", "zyh2")
+	c.TransSend("SET", "b", "zyh3")
+	fmt.Println(c.TransExec())
 }
