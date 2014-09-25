@@ -5,21 +5,7 @@ import (
 	"testing"
 )
 
-func ATestMultiPool(t *testing.T) {
-	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991@1234567980"}
-	addr := "10.16.15.121:9731"
-	mp := NewMultiPool(addresses)
-
-	c := mp.PopByAddr(addr)
-	if c == nil {
-		fmt.Println("c == nil")
-		return
-	}
-	c.Info()
-	mp.PushByAddr(addr, c)
-}
-
-func ATestPoolNoAuth(t *testing.T) {
+func TestPoolNoAuth(t *testing.T) {
 	p := NewPool("10.16.15.121:9731", "")
 	connSlice := make([]*Conn, 0, 25)
 	for i := 0; i < 5; i++ {
@@ -37,7 +23,7 @@ func ATestPoolNoAuth(t *testing.T) {
 	}
 }
 
-func ATestPoolAuth(t *testing.T) {
+func TestPoolAuth(t *testing.T) {
 	p := NewPool("10.16.15.121:9991", "1234567890")
 	fmt.Println(p.Actives())
 	fmt.Println(p.Idles())

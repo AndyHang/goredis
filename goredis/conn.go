@@ -11,11 +11,10 @@ import (
 )
 
 const (
-	ConnectTimeout     = 5e9
-	ReadTimeout        = 5e9
-	WriteTimeout       = 5e9
-	DefaultBufferSize  = 64
-	DefaultArgsBufSize = 10
+	ConnectTimeout    = 60e9
+	ReadTimeout       = 60e9
+	WriteTimeout      = 60e9
+	DefaultBufferSize = 64
 
 	TypeError        = '-'
 	TypeSimpleString = '+'
@@ -25,7 +24,10 @@ const (
 )
 
 var (
-	ErrNil = errors.New("nil data return")
+	ErrNil           = errors.New("nil data return")
+	ErrBadType       = errors.New("invalid return type")
+	ErrBadTcpConn    = errors.New("invalid tcp conn")
+	ErrBadTerminator = errors.New("invalid terminator")
 )
 
 type Conn struct {
@@ -51,10 +53,8 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		argsBuf:        make([]interface{}, DefaultArgsBufSize),
 		rb:             bufio.NewReader(conn),
 		wb:             bufio.NewWriter(conn),
-		// rb:           bufio.NewReaderSize(conn, 16),
-		// wb:           bufio.NewWriterSize(conn, 16),
-		readTimeout:  readTimeout,
-		writeTimeout: writeTimeout,
+		readTimeout:    readTimeout,
+		writeTimeout:   writeTimeout,
 	}
 }
 
@@ -65,7 +65,7 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 		return nil, e
 	}
 	if _, ok := c.(*net.TCPConn); !ok {
-		return nil, errors.New("invalid tcp conn")
+		return nil, ErrBadTcpConn
 	}
 
 	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive)
@@ -79,7 +79,7 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 
 func (c *Conn) Close() {
 	if c.conn != nil {
-		c.Close()
+		c.conn.Close()
 	}
 }
 
@@ -236,7 +236,7 @@ func (c *Conn) readResponse() (interface{}, error) {
 	default:
 	}
 
-	return nil, errors.New("illegal response type")
+	return nil, ErrBadType
 }
 
 func (c *Conn) readLine() ([]byte, error) {
@@ -248,18 +248,18 @@ func (c *Conn) readLine() ([]byte, error) {
 
 	i := len(p) - 2
 	if i <= 0 {
-		return nil, errors.New("invalid terminator")
+		return nil, ErrBadTerminator
 	}
 	return p[:i], nil
 }
 
-// func (c *Conn) parseInt(p []byte) (int64, error) {
-// 	n, e := strconv.ParseInt(string(p), base, bitSize)
-// 	if e != nil {
-// 		return 0, e
-// 	}
-// 	return n, nil
-// }
+func (c *Conn) parseInt(p []byte) (int64, error) {
+	n, e := strconv.ParseInt(string(p), base, bitSize)
+	if e != nil {
+		return 0, e
+	}
+	return n, nil
+}
 
 func (c *Conn) parseBulkString(p []byte) ([]byte, error) {
 	n, e := strconv.ParseInt(string(p), 10, 64)
@@ -323,7 +323,7 @@ func (c *Conn) MULTI() error {
 		return e
 	}
 	if _, ok := ret.([]byte); !ok {
-		return errors.New("invalid return type")
+		return ErrBadType
 	}
 	r := ret.([]byte)
 	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
@@ -339,7 +339,35 @@ func (c *Conn) TransSend(command string, args ...interface{}) error {
 		return e
 	}
 	if _, ok := ret.([]byte); !ok {
-		return errors.New("invalid return type")
+		return ErrBadType
+	}
+	r := ret.([]byte)
+	if len(r) == 6 &&
+		r[0] == 'Q' && r[1] == 'U' && r[2] == 'E' && r[3] == 'U' && r[4] == 'E' && r[5] == 'D' {
+		return nil
+	}
+	return errors.New("invalid return:" + string(r))
+}
+
+func (c *Conn) TransExec() ([]interface{}, error) {
+	ret, e := c.Call("EXEC")
+	if e = c.wb.Flush(); e != nil {
+		return nil, e
+	}
+	if ret == nil {
+		// nil indicate transaction failed
+		return nil, ErrNil
+	}
+	return ret.([]interface{}), e
+}
+
+func (c *Conn) Discard() error {
+	ret, e := c.Call("DISCARD")
+	if e != nil {
+		return e
+	}
+	if _, ok := ret.([]byte); !ok {
+		return ErrBadType
 	}
 	r := ret.([]byte)
 	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
@@ -348,10 +376,21 @@ func (c *Conn) TransSend(command string, args ...interface{}) error {
 	return errors.New("invalid return:" + string(r))
 }
 
-func (c *Conn) TransExec() ([]interface{}, error) {
-	r, e := c.Call("EXEC")
-	if e = c.wb.Flush(); e != nil {
-		return nil, e
+func (c *Conn) Watch(keys []string) error {
+	args := make([]interface{}, len(keys))
+	for i, key := range args {
+		args[i] = key
 	}
-	return r.([]interface{}), e
+	ret, e := c.Call("WATCH", args...)
+	if e != nil {
+		return e
+	}
+	if _, ok := ret.([]byte); !ok {
+		return ErrBadType
+	}
+	r := ret.([]byte)
+	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
+		return nil
+	}
+	return errors.New("invalid return:" + string(r))
 }

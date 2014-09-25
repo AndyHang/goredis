@@ -39,14 +39,16 @@ func NewMultiPool(addresses []string) *MultiPool {
 
 // get conn by address directly
 func (mp *MultiPool) PopByAddr(addr string) *Conn {
-	if _, ok := mp.pools[addr]; ok {
+	if _, ok := mp.pools[addr]; !ok {
+		fmt.Println("[PopByAddr] invalid address:" + addr)
 		return nil
 	}
 	return mp.pools[addr].Pop()
 }
 
 func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
-	if _, ok := mp.pools[addr]; ok {
+	if _, ok := mp.pools[addr]; !ok {
+		fmt.Println("[PushByAddr] invalid address:" + addr)
 		return
 	}
 	mp.pools[addr].Push(c)
@@ -55,7 +57,8 @@ func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
 // sum(key)/len(pools)
 func (mp *MultiPool) PopByKey(key string) *Conn {
 	addr := mp.servers[Sum(key)/len(mp.pools)]
-	if _, ok := mp.pools[addr]; ok {
+	if _, ok := mp.pools[addr]; !ok {
+		fmt.Println("[PopByKey] invalid address:" + addr)
 		return nil
 	}
 	return mp.pools[addr].Pop()
@@ -63,7 +66,8 @@ func (mp *MultiPool) PopByKey(key string) *Conn {
 
 func (mp *MultiPool) PushByKey(key string, c *Conn) {
 	addr := mp.servers[Sum(key)/len(mp.pools)]
-	if _, ok := mp.pools[addr]; ok {
+	if _, ok := mp.pools[addr]; !ok {
+		fmt.Println("[PushByKey] invalid address:" + addr)
 		return
 	}
 	mp.pools[addr].Push(c)
@@ -131,6 +135,7 @@ PopLoop:
 			p.mu.RLock()
 			if p.IdleNum+p.ActiveNum >= MaxConnNum {
 				p.mu.RUnlock()
+				fmt.Println("waiting................")
 				if waitSeconds <= 0 {
 					break PopLoop
 				}
@@ -140,14 +145,19 @@ PopLoop:
 				break
 			}
 			p.mu.RUnlock()
-			c, e := Dial(p.Address, p.Password, ConnectTimeout, ReadTimeout, WriteTimeout, true)
-			if e != nil {
-				fmt.Println("dial conn error")
-				break PopLoop
-			}
+
 			p.mu.Lock()
 			p.ActiveNum++
 			p.mu.Unlock()
+			c, e := Dial(p.Address, p.Password, ConnectTimeout, ReadTimeout, WriteTimeout, true)
+			if e != nil {
+				p.mu.Lock()
+				p.ActiveNum--
+				p.mu.Unlock()
+				fmt.Println("dial conn error")
+				break PopLoop
+			}
+
 			p.Push(c)
 		}
 	}
