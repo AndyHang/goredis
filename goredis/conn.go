@@ -30,14 +30,13 @@ var (
 	ErrBadTerminator = errors.New("invalid terminator")
 )
 
+//
 type Conn struct {
-	pipeCount      int
-	multiCount     int
-	conn           *net.TCPConn
-	lastActiveTime int64
 	keepAlive      bool
+	pipeCount      int
+	lastActiveTime int64
 	buffer         []byte
-	argsBuf        []interface{}
+	conn           *net.TCPConn
 	rb             *bufio.Reader
 	wb             *bufio.Writer
 	readTimeout    time.Duration
@@ -50,7 +49,6 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		lastActiveTime: time.Now().Unix(),
 		keepAlive:      keepAlive,
 		buffer:         make([]byte, DefaultBufferSize),
-		argsBuf:        make([]interface{}, DefaultArgsBufSize),
 		rb:             bufio.NewReader(conn),
 		wb:             bufio.NewWriter(conn),
 		readTimeout:    readTimeout,
@@ -254,7 +252,7 @@ func (c *Conn) readLine() ([]byte, error) {
 }
 
 func (c *Conn) parseInt(p []byte) (int64, error) {
-	n, e := strconv.ParseInt(string(p), base, bitSize)
+	n, e := strconv.ParseInt(string(p), 10, 64)
 	if e != nil {
 		return 0, e
 	}
@@ -333,7 +331,6 @@ func (c *Conn) MULTI() error {
 }
 
 func (c *Conn) TransSend(command string, args ...interface{}) error {
-	c.multiCount++
 	ret, e := c.Call(command, args...)
 	if e != nil {
 		return e
