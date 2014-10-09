@@ -5,6 +5,26 @@ import (
 	"testing"
 )
 
+func TestCallN(t *testing.T) {
+	p := NewPool("10.16.15.121:9731", "")
+	c := p.Pop()
+	fmt.Println(c.CallN(2, "HMGET", "a", "a"))
+}
+
+func TestPipeSmallBuffer(t *testing.T) {
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false, nil)
+	if e != nil {
+		println(e.Error())
+		return
+	}
+	defer c.conn.Close()
+	// test pipeline
+	for i := 0; i < 1000; i++ {
+		c.PipeSend("INCR", "Zincr")
+	}
+	fmt.Println(c.PipeExec())
+}
+
 func TestPoolNoAuth(t *testing.T) {
 	p := NewPool("10.16.15.121:9731", "")
 	connSlice := make([]*Conn, 0, 25)
@@ -39,7 +59,7 @@ func TestPoolAuth(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
-	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false)
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false, nil)
 	if e != nil {
 		println(e.Error())
 		return
@@ -47,8 +67,12 @@ func TestWrite(t *testing.T) {
 	defer c.conn.Close()
 
 	// test commands
-	key := "zyh0924"
+	key := "zyh1008"
 	args := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}
+	fmt.Println(c.SET(key, "zzzaaa"))
+	fmt.Println(c.GET(key))
+	return
+
 	fmt.Println(c.SADD(key, args))
 	fmt.Println(c.SMEMBERS(key))
 	fmt.Println(c.DEL([]string{key}))

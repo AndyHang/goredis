@@ -3,7 +3,7 @@ package msgredis
 import (
 	// "fmt"
 	"runtime"
-	"strconv"
+	// "strconv"
 	"sync"
 	"testing"
 	"time"
@@ -28,8 +28,9 @@ func TestMultiPool(t *testing.T) {
 				t.Error("c==nil....................")
 				return
 			}
-			c.PipeSend("set", strconv.Itoa(i), strconv.Itoa(i))
-			c.PipeExec()
+			// c.PipeSend("set", strconv.Itoa(i), strconv.Itoa(i))
+			// c.PipeExec()
+			c.CallN(3, "PING")
 			mp.PushByAddr(addr, c)
 		}()
 	}

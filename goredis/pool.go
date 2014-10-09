@@ -2,6 +2,7 @@ package msgredis
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -149,12 +150,12 @@ PopLoop:
 			p.mu.Lock()
 			p.ActiveNum++
 			p.mu.Unlock()
-			c, e := Dial(p.Address, p.Password, ConnectTimeout, ReadTimeout, WriteTimeout, true)
+			c, e := Dial(p.Address, p.Password, ConnectTimeout, ReadTimeout, WriteTimeout, true, p)
 			if e != nil {
 				p.mu.Lock()
 				p.ActiveNum--
 				p.mu.Unlock()
-				fmt.Println("dial conn error")
+				fmt.Println(e.Error())
 				break PopLoop
 			}
 
@@ -205,6 +206,16 @@ func (p *Pool) Idles() int {
 	n = p.IdleNum
 	p.mu.RUnlock()
 	return n
+}
+
+// 返回string，根据需要可能会修改返回值类型，如果info包含其他信息
+func (p *Pool) PoolInfo() string {
+	var IdleN, ActiveN int
+	p.mu.RLock()
+	IdleN = p.IdleNum
+	ActiveN = p.IdleNum
+	p.mu.RUnlock()
+	return "ActiveNum=" + strconv.Itoa(ActiveN) + " IdleNum=" + strconv.Itoa(IdleN)
 }
 
 // 哈希算法

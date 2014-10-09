@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,8 @@ const (
 	ReadTimeout       = 60e9
 	WriteTimeout      = 60e9
 	DefaultBufferSize = 64
+
+	RetryWaitSeconds = 2e9
 
 	TypeError        = '-'
 	TypeSimpleString = '+'
@@ -28,6 +31,10 @@ var (
 	ErrBadType       = errors.New("invalid return type")
 	ErrBadTcpConn    = errors.New("invalid tcp conn")
 	ErrBadTerminator = errors.New("invalid terminator")
+	ErrResponse      = errors.New("bad call")
+	ErrNilPool       = errors.New("conn not belongs to any pool")
+
+	CommonErrPrefix = "CommonError:"
 )
 
 //
@@ -41,9 +48,10 @@ type Conn struct {
 	wb             *bufio.Writer
 	readTimeout    time.Duration
 	writeTimeout   time.Duration
+	pool           *Pool
 }
 
-func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool) *Conn {
+func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool) *Conn {
 	return &Conn{
 		conn:           conn,
 		lastActiveTime: time.Now().Unix(),
@@ -53,11 +61,12 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		wb:             bufio.NewWriter(conn),
 		readTimeout:    readTimeout,
 		writeTimeout:   writeTimeout,
+		pool:           pool,
 	}
 }
 
 // connect with timeout
-func Dial(address, password string, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool) (*Conn, error) {
+func Dial(address, password string, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool) (*Conn, error) {
 	c, e := net.DialTimeout("tcp", address, connectTimeout)
 	if e != nil {
 		return nil, e
@@ -66,7 +75,7 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 		return nil, ErrBadTcpConn
 	}
 
-	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive)
+	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive, pool)
 	if password != "" {
 		if _, e := conn.AUTH(password); e != nil {
 			return nil, e
@@ -79,6 +88,29 @@ func (c *Conn) Close() {
 	if c.conn != nil {
 		c.conn.Close()
 	}
+}
+
+// 连接无效了，无法从这里取一条新的连接，除非c里面有一个pool的指针
+func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{}, error) {
+	var ret interface{}
+	var e error
+	for i := 0; i < retry; i++ {
+		ret, e = c.Call(command, args...)
+		if e != nil && !strings.Contains(e.Error(), CommonErrPrefix) {
+			time.Sleep(RetryWaitSeconds)
+			// get a new conn from pool
+			c.Close()
+			if c.pool == nil {
+				return nil, e
+			}
+			c = c.pool.Pop()
+			if c == nil {
+				return nil, e
+			}
+			continue
+		}
+	}
+	return ret, e
 }
 
 // call redis command with request => response model
@@ -112,7 +144,6 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 
 // write response
 func (c *Conn) writeRequest(command string, args []interface{}) error {
-	fmt.Println("REQUEST:", command, args)
 	var e error
 	if e = c.writeLen('*', 1+len(args)); e != nil {
 		return e
@@ -222,9 +253,10 @@ func (c *Conn) readResponse() (interface{}, error) {
 	p = p[1:]
 	switch resType {
 	case TypeError:
-		return nil, errors.New(string(p))
+		// 错误操作，非网络错误，不应该重建连接
+		return nil, errors.New(CommonErrPrefix + string(p))
 	case TypeIntegers:
-		return strconv.ParseInt(string(p), 10, 64)
+		return c.parseInt(p)
 	case TypeSimpleString:
 		return p, nil
 	case TypeBulkString:
@@ -233,12 +265,17 @@ func (c *Conn) readResponse() (interface{}, error) {
 		return c.parseArray(p)
 	default:
 	}
-
-	return nil, ErrBadType
+	return nil, errors.New(CommonErrPrefix + "Err type")
 }
 
-func (c *Conn) readLine() ([]byte, error) {
-	var e error
+func (c *Conn) readLine() (b []byte, e error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in readLine", r)
+			e = errors.New("readLine painc")
+		}
+	}()
+	// var e error
 	p, e := c.rb.ReadBytes('\n')
 	if e != nil {
 		return nil, e
@@ -254,7 +291,7 @@ func (c *Conn) readLine() ([]byte, error) {
 func (c *Conn) parseInt(p []byte) (int64, error) {
 	n, e := strconv.ParseInt(string(p), 10, 64)
 	if e != nil {
-		return 0, e
+		return 0, errors.New(CommonErrPrefix + e.Error())
 	}
 	return n, nil
 }
@@ -262,7 +299,7 @@ func (c *Conn) parseInt(p []byte) (int64, error) {
 func (c *Conn) parseBulkString(p []byte) ([]byte, error) {
 	n, e := strconv.ParseInt(string(p), 10, 64)
 	if e != nil {
-		return []byte{}, e
+		return []byte{}, errors.New(CommonErrPrefix + e.Error())
 	}
 	if n == -1 {
 		return nil, nil
@@ -276,7 +313,7 @@ func (c *Conn) parseBulkString(p []byte) ([]byte, error) {
 func (c *Conn) parseArray(p []byte) ([]interface{}, error) {
 	n, e := strconv.ParseInt(string(p), 10, 64)
 	if e != nil {
-		return nil, e
+		return nil, errors.New(CommonErrPrefix + e.Error())
 	}
 
 	if n == -1 {
@@ -294,6 +331,7 @@ func (c *Conn) parseArray(p []byte) ([]interface{}, error) {
 	return result, nil
 }
 
+// pipeline与transactions没有用callN，失败没有重试
 // pipeline
 func (c *Conn) PipeSend(command string, args ...interface{}) error {
 	c.pipeCount++
