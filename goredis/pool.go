@@ -77,7 +77,7 @@ func (mp *MultiPool) PushByKey(key string, c *Conn) {
 const (
 	// MaxIdleNum     = 20
 	// MaxActiveNum   = 20
-	MaxConnNum     = 20
+	MaxConnNum     = 50
 	MaxIdleSeconds = 28
 )
 
@@ -89,6 +89,11 @@ type Pool struct {
 	ActiveNum  int
 	ClientPool chan *Conn
 	mu         sync.RWMutex
+
+	CallNum int64
+	callMu  sync.RWMutex
+
+	CallConsume map[string]int
 }
 
 func NewPool(address, password string) *Pool {
@@ -109,7 +114,7 @@ PopLoop:
 	for {
 		select {
 		case c = <-p.ClientPool:
-			fmt.Println("[Pop] in case")
+			// fmt.Println("[Pop] in case")
 			if time.Now().Unix()-c.lastActiveTime > MaxIdleSeconds {
 				c.Close()
 				p.mu.Lock()
@@ -132,11 +137,11 @@ PopLoop:
 			p.mu.Unlock()
 			break PopLoop
 		default:
-			fmt.Println("[Pop] in default")
+			// fmt.Println("[Pop] in default")
 			p.mu.RLock()
 			if p.IdleNum+p.ActiveNum >= MaxConnNum {
 				p.mu.RUnlock()
-				fmt.Println("waiting................")
+				// fmt.Println("waiting................")
 				if waitSeconds <= 0 {
 					break PopLoop
 				}
@@ -184,7 +189,7 @@ func (p *Pool) Push(c *Conn) {
 		p.IdleNum++
 		p.ActiveNum--
 		p.mu.Unlock()
-		fmt.Println("[Push] success")
+		// fmt.Println("[Push] success")
 	default:
 		c.Close()
 		fmt.Println("[Push] discard")
@@ -215,7 +220,25 @@ func (p *Pool) PoolInfo() string {
 	IdleN = p.IdleNum
 	ActiveN = p.IdleNum
 	p.mu.RUnlock()
-	return "ActiveNum=" + strconv.Itoa(ActiveN) + " IdleNum=" + strconv.Itoa(IdleN)
+	return "ActiveNum=" + strconv.Itoa(ActiveN) + "\n IdleNum=" + strconv.Itoa(IdleN) + " \n"
+}
+
+func (p *Pool) QPS() int64 {
+	var n int64 = 0
+	qps := make([]int64, 4)
+	p.callMu.RLock()
+	n = p.CallNum
+	p.callMu.RUnlock()
+
+	for i := 0; i < 3; i++ {
+		time.Sleep(time.Second)
+		p.callMu.RLock()
+		qps[i] = p.CallNum - n
+		n = p.CallNum
+		p.callMu.RUnlock()
+	}
+	qps[3] = (qps[0] + qps[1] + qps[2]) / 3
+	return qps[3]
 }
 
 // 哈希算法

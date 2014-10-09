@@ -33,6 +33,7 @@ var (
 	ErrBadTerminator = errors.New("invalid terminator")
 	ErrResponse      = errors.New("bad call")
 	ErrNilPool       = errors.New("conn not belongs to any pool")
+	ErrKeyNotExist   = errors.New(CommonErrPrefix + "key not exist")
 
 	CommonErrPrefix = "CommonError:"
 )
@@ -116,6 +117,12 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 // call redis command with request => response model
 func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	c.lastActiveTime = time.Now().Unix()
+	// start := time.Now()
+	if c.pool != nil {
+		c.pool.callMu.Lock()
+		c.pool.CallNum++
+		c.pool.callMu.Unlock()
+	}
 	var e error
 	if c.writeTimeout > 0 {
 		if e = c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); e != nil {
@@ -139,6 +146,7 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	if e != nil {
 		return nil, e
 	}
+	// fmt.Println(command+" costs:", time.Now().Sub(start).String())
 	return response, e
 }
 
@@ -296,7 +304,7 @@ func (c *Conn) parseInt(p []byte) (int64, error) {
 	return n, nil
 }
 
-func (c *Conn) parseBulkString(p []byte) ([]byte, error) {
+func (c *Conn) parseBulkString(p []byte) (interface{}, error) {
 	n, e := strconv.ParseInt(string(p), 10, 64)
 	if e != nil {
 		return []byte{}, errors.New(CommonErrPrefix + e.Error())
