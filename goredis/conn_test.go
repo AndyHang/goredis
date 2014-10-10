@@ -3,6 +3,7 @@ package msgredis
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestCallN(t *testing.T) {
@@ -100,7 +101,7 @@ func TestCommands(t *testing.T) {
 	fmt.Println(c.KEYS("*dadfjiii*"))
 
 	key := "zyh1009"
-	fmt.Println("STRINGS.........................")
+	fmt.Println("STRINGS.************************STRINGS**********************.STRINGS")
 	fmt.Println(c.Call("FLUSHDB"))
 	fmt.Println(c.GET(key))
 	fmt.Println(c.SET(key, "zyh1009"))
@@ -122,7 +123,7 @@ func TestCommands(t *testing.T) {
 	// hashes
 	key = "hashesZYH"
 	fields := []string{"f1", "f2"}
-	fmt.Println("HASHES.........................")
+	fmt.Println("HASHES.************************HASHES**********************.HASHES")
 	fmt.Println(c.HDEL(key, fields))
 	fmt.Println(c.HEXISTS(key, fields[0]))
 	fmt.Println(c.HEXISTS(key, "noexists"))
@@ -145,6 +146,30 @@ func TestCommands(t *testing.T) {
 	fmt.Println(c.HSETNX(key, "fieldFloat11", 1.6))
 	fmt.Println(c.HVALS(key))
 
+	fmt.Println("LISTS.***********************LISTS***********************.LISTS")
+	key = "listsZYH"
+	key1 := "lists1"
+	fmt.Println(c.BLPOP([]string{"key11", "key21"}, 2))
+	fmt.Println(c.BRPOP([]string{"key11", "key12"}, 2))
+	fmt.Println(c.LPUSH(key, []string{"a", "b", "c"}))
+	fmt.Println(c.RPUSH(key, []string{"x", "y", "z", "a"}))
+	fmt.Println(c.BRPOPLPUSH(key, key1, 1))
+	fmt.Println(c.LINDEX(key, 4))
+	fmt.Println(c.LINSERT(key, "after", "a", "d"))
+	fmt.Println(c.LLEN(key))
+	fmt.Println(c.LPUSHX("noexists", "value"))
+	fmt.Println(c.LRANGE(key, 0, 10))
+	fmt.Println(c.LREM(key, -1, "a"))
+	fmt.Println(c.LSET(key, 0, "0"))
+	fmt.Println(c.LTRIM(key, 1, -1))
+	fmt.Println(c.RPOP(key))
+	fmt.Println(c.RPOPLPUSH(key, key1))
+	fmt.Println(c.RPUSHX(key, "value"))
+
+	fmt.Println("SETS.**************************SETS*********************.SETS")
+
+	fmt.Println("SORTED SETS.********************SORTED SETS******************.SORTED SETS")
+	// key = "listsZYH"
 }
 
 func TestQPS(t *testing.T) {
@@ -154,8 +179,14 @@ func TestQPS(t *testing.T) {
 		go call(c)
 	}
 
-	go fmt.Println("QPS:", p.QPS())
-	select {}
+	go func() {
+		for {
+			fmt.Println("QPS:", p.QPS())
+		}
+	}()
+
+	// select {}
+	time.Sleep(11e9)
 }
 
 func call(c *Conn) {
