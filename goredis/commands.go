@@ -4,6 +4,7 @@ package msgredis
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 func (c *Conn) AUTH(password string) (bool, error) {
@@ -533,6 +534,8 @@ func (c *Conn) STRLEN(key string) (int64, error) {
 	return v.(int64), e
 }
 
+func (c *Conn) SSCAN(key string) {}
+
 /******************* hashes commands *******************/
 func (c *Conn) HDEL(key string, fields []string) (int64, error) {
 	args := make([]interface{}, len(fields)+1)
@@ -675,6 +678,210 @@ func (c *Conn) HVALS(key string) ([]interface{}, error) {
 	if e != nil {
 		return nil, e
 	}
-
 	return v.([]interface{}), nil
 }
+
+func (c *Conn) HSCAN() {}
+
+/******************* lists commands *******************/
+func (c *Conn) BLPOP(keys []string, timeout int) ([]interface{}, error) {
+	args := make([]interface{}, len(keys)+1)
+	for k, v := range keys {
+		args[k] = v
+	}
+	args[len(keys)] = timeout
+
+	v, e := c.Call("BLPOP", args...)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]interface{}), nil
+}
+
+func (c *Conn) BRPOP(keys []string, timeout int) ([]interface{}, error) {
+	args := make([]interface{}, len(keys)+1)
+	for k, v := range keys {
+		args[k] = v
+	}
+	args[len(keys)] = timeout
+
+	v, e := c.Call("BRPOP", args...)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]interface{}), nil
+}
+
+func (c *Conn) BRPOPLPUSH(source, dest string, timeout int) ([]byte, error) {
+	v, e := c.Call("BRPOPLPUSH", source, dest, timeout)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) LINDEX(key string, index int) ([]byte, error) {
+	v, e := c.Call("LINDEX", key, index)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) LINSERT(key, dir, pivot, value string) (int64, error) {
+	if strings.ToLower(dir) != "before" && strings.ToLower(dir) != "after" {
+		return -1, errors.New(CommonErrPrefix + "dir only can be (before or after)")
+	}
+	n, e := c.Call("LINSERT", key, dir, pivot, value)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) LLEN(key string) (int64, error) {
+	n, e := c.Call("LLEN", key)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) LPOP(key string) ([]byte, error) {
+	v, e := c.Call("LPOP", key)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) LPUSH(key string, values []string) (int64, error) {
+	args := make([]interface{}, len(values)+1)
+	args[0] = key
+	for i, v := range values {
+		args[i+1] = v
+	}
+	n, e := c.Call("LPUSH", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) LPUSHX(key, value string) (int64, error) {
+	n, e := c.Call("LPUSHX", key, value)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) LRANGE(key string, start, end int) ([]interface{}, error) {
+	v, e := c.Call("LRANGE", key, start, end)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]interface{}), nil
+}
+
+func (c *Conn) LREM(key string, count int, value string) (int64, error) {
+	n, e := c.Call("LREM", key, count, value)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) LSET(key string, index int, value string) ([]byte, error) {
+	v, e := c.Call("LSET", key, index, value)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) LTRIM(key string, start, end int) ([]byte, error) {
+	v, e := c.Call("LTRIM", key, start, end)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) RPOP(key string) ([]byte, error) {
+	v, e := c.Call("RPOP", key)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) RPOPLPUSH(source, dest string) ([]byte, error) {
+	v, e := c.Call("RPOPLPUSH", source, dest)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) RPUSH(key string, values []string) (int64, error) {
+	args := make([]interface{}, len(values)+1)
+	args[0] = key
+	for i, v := range values {
+		args[i+1] = v
+	}
+	n, e := c.Call("RPUSH", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) RPUSHX(key, value string) (int64, error) {
+	n, e := c.Call("RPUSHX", key, value)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+/******************* sorted sets commands *******************/
+func (c *Conn) ZADD()             {}
+func (c *Conn) ZCARD()            {}
+func (c *Conn) ZCOUNT()           {}
+func (c *Conn) ZINCRBY()          {}
+func (c *Conn) ZINTERSTORE()      {}
+func (c *Conn) ZLEXCOUNT()        {}
+func (c *Conn) ZRANGE()           {}
+func (c *Conn) ZRANGEBYLEX()      {}
+func (c *Conn) ZREVRANGEBYLEX()   {}
+func (c *Conn) ZRANGEBYSCORE()    {}
+func (c *Conn) ZRANK()            {}
+func (c *Conn) ZREM()             {}
+func (c *Conn) ZREMRANGEBYLEX()   {}
+func (c *Conn) ZREMRANGEBYSCORE() {}
+func (c *Conn) ZREVRANK()         {}
+func (c *Conn) ZSCORE()           {}
+func (c *Conn) ZUNIONSTORE()      {}
+func (c *Conn) ZSCAN()            {}
