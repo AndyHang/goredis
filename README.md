@@ -24,7 +24,7 @@ golang redis client, bufferd connection, connection pool
 >		c.PipeSend("SET", "c", "zyh")
 >		c.PipeExec()
 
-###		Transaction
+####	Transaction
 >		c.MULTI()
 >		c.TransSend("SET", "a", "zyh2")
 >		c.TransSend("SET", "b", "zyh3")
