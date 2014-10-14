@@ -23,7 +23,7 @@ func NewMultiPool(addresses []string) *MultiPool {
 		addrPass := strings.Split(addr, "@")
 		if len(addrPass) == 2 {
 			// redis need auth
-			pools[addr] = NewPool(addrPass[0], addrPass[1])
+			pools[addrPass[0]] = NewPool(addrPass[0], addrPass[1])
 		} else if len(addrPass) == 1 {
 			// redis do not need auth
 			pools[addr] = NewPool(addrPass[0], "")
