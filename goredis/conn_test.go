@@ -149,8 +149,8 @@ func TestCommands(t *testing.T) {
 	fmt.Println("LISTS.***********************LISTS***********************.LISTS")
 	key = "listsZYH"
 	key1 := "lists1"
-	fmt.Println(c.BLPOP([]string{"key11", "key21"}, 2))
-	fmt.Println(c.BRPOP([]string{"key11", "key12"}, 2))
+	fmt.Println(c.BLPOP([]string{"key11", "key21"}, 1))
+	fmt.Println(c.BRPOP([]string{"key11", "key12"}, 1))
 	fmt.Println(c.LPUSH(key, []string{"a", "b", "c"}))
 	fmt.Println(c.RPUSH(key, []string{"x", "y", "z", "a"}))
 	fmt.Println(c.BRPOPLPUSH(key, key1, 1))
@@ -167,9 +167,57 @@ func TestCommands(t *testing.T) {
 	fmt.Println(c.RPUSHX(key, "value"))
 
 	fmt.Println("SETS.**************************SETS*********************.SETS")
+	key = "setsZYH"
+	key1 = "setsZYH1"
+	keys := []string{key, key1}
+	fmt.Println(c.SADD(key, []string{"a", "b", "c"}))
+	fmt.Println(c.SADD(key1, []string{"c", "d", "e"}))
+	fmt.Println(c.SREM(key, []string{"a"}))
+	fmt.Println(c.SISMEMBER(key, "b"))
+	fmt.Println(c.SMEMBERS(key))
+	fmt.Println(c.SCARD(key))
+	fmt.Println(c.SINTER([]string{key, key1}))
+	fmt.Println(c.SINTERSTORE("interSets", []string{key, key1}))
+	fmt.Println(c.SDIFF([]string{key, key1}))
+	fmt.Println(c.SDIFFSTORE("diffSets", []string{key, key1}))
+	fmt.Println(c.SMOVE("srcKey", "desKey", "c"))
+	fmt.Println(c.SPOP(key))
+
+	fmt.Println("SRANDMEMBER........")
+	fmt.Println(c.SRANDMEMBER(key, 5))
+	fmt.Println(c.SUNION(keys))
+	fmt.Println(c.SUNIONSTORE("unionSets", keys))
 
 	fmt.Println("SORTED SETS.********************SORTED SETS******************.SORTED SETS")
-	// key = "listsZYH"
+	key = "zsetsZYH"
+	key1 = "zsetsZYH1"
+	keyScores := make(map[string]interface{}, 4)
+	keyScores["k1"] = 1.12
+	keyScores["k2"] = 2
+	keyScores["k3"] = 19
+	fmt.Println(c.ZADD(key, keyScores))
+	fmt.Println(c.ZCARD(key))
+	fmt.Println(c.ZCOUNT(key, 1, 3))
+	fmt.Println(c.ZINCRBY(key, -0.9, "k1"))
+	fmt.Println(c.ZADD(key1, keyScores))
+	fmt.Println(c.ZINTERSTORE("out1", 2, []string{key, key1}, true, []int{2, 3}, true, "min"))
+	// fmt.Println(c.ZLEXCOUNT(key, "-", "+"))
+	fmt.Println(c.ZRANGE(key, 0, 2, true))
+	// fmt.Println(c.ZRANGEBYLEX(key, "[a", "[z", true, 0, 1))
+	// fmt.Println(c.ZREVRANGEBYLEX(key, "(z", "[a", true, 0, 4))
+	fmt.Println(c.ZRANGEBYSCORE(key, 0, 3.1, true, true, 0, 5))
+	fmt.Println(c.ZRANK(key, "k1"))
+	fmt.Println(c.ZREM(key1, []string{"k2"}))
+	// fmt.Println(c.ZREMRANGEBYLEX(key, "-", "+"))
+	fmt.Println(c.ZREMRANGEBYSCORE(key, 0, 1))
+	fmt.Println(c.ZREVRANGE(key, 0, -1, true))
+	fmt.Println(c.ZREVRANGEBYSCORE(key, 4, -1.1, true, true, 0, 7))
+	fmt.Println(c.ZREVRANK(key, "k2"))
+	fmt.Println(c.ZSCORE(key, "k3"))
+
+	fmt.Println(c.ZADD("key", keyScores))
+	fmt.Println(c.ZADD("key1", keyScores))
+	fmt.Println(c.ZUNIONSTORE("out2", 2, []string{"key", "key1"}, false, nil, false, ""))
 }
 
 func TestQPS(t *testing.T) {
@@ -235,5 +283,123 @@ func call(c *Conn) {
 		c.HVALS(key)
 
 	}
+}
 
+func TestSCAN(t *testing.T) {
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false, nil)
+	if e != nil {
+		println(e.Error())
+		return
+	}
+	defer c.conn.Close()
+
+	// test scan
+	fmt.Println("........................TESTING SCAN.......................")
+	cursor, elements, e := c.SCAN(0, false, "", false, 0)
+	if e != nil {
+		fmt.Println(e)
+		return
+	}
+
+	eles := []string{}
+	for _, iface := range elements {
+		eles = append(eles, string(iface.([]byte)))
+	}
+	fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	for cursor != 0 {
+		cursor, elements, e = c.SCAN(cursor, false, "", false, 0)
+		if e != nil {
+			fmt.Println(e)
+			return
+		}
+		eles := []string{}
+		for _, iface := range elements {
+			eles = append(eles, string(iface.([]byte)))
+		}
+		fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	}
+
+	// test sscan
+	fmt.Println("........................TESTING sets SCAN.......................")
+	key := "setsZYH"
+	cursor, elements, e = c.SSCAN(key, 0, true, "*", true, 15)
+	if e != nil {
+		fmt.Println(e)
+		return
+	}
+
+	eles = []string{}
+	for _, iface := range elements {
+		eles = append(eles, string(iface.([]byte)))
+	}
+
+	fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	for cursor != 0 {
+		cursor, elements, e = c.SSCAN(key, cursor, true, "*", true, 15)
+		if e != nil {
+			fmt.Println(e)
+			return
+		}
+		eles := []string{}
+		for _, iface := range elements {
+			eles = append(eles, string(iface.([]byte)))
+		}
+		fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	}
+
+	// test hscan
+	fmt.Println("........................TESTING Hashes SCAN.......................")
+	key = "hashesZYH"
+	cursor, elements, e = c.HSCAN(key, 0, true, "*1*", false, 15)
+	if e != nil {
+		fmt.Println(e)
+		return
+	}
+
+	eles = []string{}
+	for _, iface := range elements {
+		eles = append(eles, string(iface.([]byte)))
+	}
+
+	fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	for cursor != 0 {
+		cursor, elements, e = c.HSCAN(key, cursor, true, "*", false, 15)
+		if e != nil {
+			fmt.Println(e)
+			return
+		}
+		eles := []string{}
+		for _, iface := range elements {
+			eles = append(eles, string(iface.([]byte)))
+		}
+		fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	}
+
+	// test hscan
+	fmt.Println("........................TESTING Sorted Sets SCAN.......................")
+	key = "zsetsZYH"
+	cursor, elements, e = c.ZSCAN(key, 0, true, "*1*", false, 15)
+	if e != nil {
+		fmt.Println(e)
+		return
+	}
+
+	eles = []string{}
+	for _, iface := range elements {
+		eles = append(eles, string(iface.([]byte)))
+	}
+
+	fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	for cursor != 0 {
+		cursor, elements, e = c.ZSCAN(key, cursor, true, "*1*", false, 15)
+		if e != nil {
+			fmt.Println(e)
+			return
+		}
+		eles := []string{}
+		for _, iface := range elements {
+			eles = append(eles, string(iface.([]byte)))
+		}
+		fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
+	}
 }
