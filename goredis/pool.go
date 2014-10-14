@@ -232,6 +232,20 @@ func (p *Pool) PoolInfo() string {
 
 func (p *Pool) QPS() int64 {
 	var n int64 = 0
+	p.callMu.RLock()
+	n = p.CallNum
+	p.callMu.RUnlock()
+
+	time.Sleep(time.Second)
+
+	p.callMu.RLock()
+	n = p.CallNum - n
+	p.callMu.RUnlock()
+	return n
+}
+
+func (p *Pool) QPSAvg() int64 {
+	var n int64 = 0
 	qps := make([]int64, 4)
 	p.callMu.RLock()
 	n = p.CallNum
