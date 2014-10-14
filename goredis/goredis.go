@@ -1,13 +1,3 @@
-// kindBulk
-//   没有：nil（没有这个 key）
-//   有  ：string（有这个 key）
-
-// kindMultiBulk
-//   没有：[]interface{}{}（没有这个 key，len() == 0）
-//   有  ：[]interface{}{"str1", "str2", "str3"}（全部子 key 都有，len() == len(subKeys)）
-//   有洞：[]interface{}{"str1", nil, "str3"}（有些子 key 没有，len() < len(subKeys)）
-//   超时：nil（目前只有 BLPOP 会返回这个值？）
-
 /*redis返回数据
 Error: 			-Error message\r\n
 
@@ -26,19 +16,6 @@ A client sends to the Redis server a RESP Array consisting of just Bulk Strings.
 A Redis server replies to clients sending any valid RESP data type as reply.
 */
 package msgredis
-
-// func (c *Conn) writeInt1(n int) error {
-// 	p := []byte{'$'}
-// 	// 调用两次itoa，且还要对string转回byte
-// 	nstr := strconv.Itoa(n)
-// 	p = append(p, strconv.Itoa(len(nstr))...)
-// 	p = append(p, nstr...)
-// 	p = append(p, '\r', '\n')
-// 	_, e := c.wb.Write(p)
-// 	if e != nil {
-// 		return e
-// 	}
-// }
 
 // painc recover
 
