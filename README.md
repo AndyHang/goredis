@@ -1,7 +1,7 @@
 goredis
 =======
 
-golang redis client, bufferd connection, connection pool
+golang redis client, bufferd connection, connection pool, support all redis commands
 
 ####	Create a new conn?
 >		c, e := Dial("127.0.0.1:6379", pwd, CTimeout, RTimeout, WTimeout, alive, *pool)
