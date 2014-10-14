@@ -34,6 +34,8 @@ var (
 	ErrResponse      = errors.New("bad call")
 	ErrNilPool       = errors.New("conn not belongs to any pool")
 	ErrKeyNotExist   = errors.New(CommonErrPrefix + "key not exist")
+	ErrBadArgs       = errors.New(CommonErrPrefix + "request args invalid")
+	ErrEmptyDB       = errors.New(CommonErrPrefix + "empty db")
 
 	CommonErrPrefix = "CommonError:"
 )
