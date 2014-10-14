@@ -116,6 +116,13 @@ PopLoop:
 		case c = <-p.ClientPool:
 			// fmt.Println("[Pop] in case")
 			if time.Now().Unix()-c.lastActiveTime > MaxIdleSeconds {
+				if c.IsAlive() {
+					p.mu.Lock()
+					p.IdleNum--
+					p.ActiveNum++
+					p.mu.Unlock()
+					break PopLoop
+				}
 				c.Close()
 				p.mu.Lock()
 				p.IdleNum--
@@ -123,14 +130,14 @@ PopLoop:
 				fmt.Println("[Pop] lastActiveTime exceed 30s")
 				break
 			}
-			if !c.IsAlive() {
-				p.mu.Lock()
-				p.IdleNum--
-				p.mu.Unlock()
-				c.Close()
-				fmt.Println("[Pop] not alive")
-				break
-			}
+			// if !c.IsAlive() {
+			// 	p.mu.Lock()
+			// 	p.IdleNum--
+			// 	p.mu.Unlock()
+			// 	c.Close()
+			// 	fmt.Println("[Pop] not alive")
+			// 	break
+			// }
 			p.mu.Lock()
 			p.IdleNum--
 			p.ActiveNum++
@@ -175,14 +182,14 @@ func (p *Pool) Push(c *Conn) {
 		fmt.Println("[Push] c == nil")
 		return
 	}
-	if !c.IsAlive() {
-		p.mu.Lock()
-		p.ActiveNum--
-		p.mu.Unlock()
-		c.Close()
-		fmt.Println("[Push] not alive")
-		return
-	}
+	// if !c.IsAlive() {
+	// 	p.mu.Lock()
+	// 	p.ActiveNum--
+	// 	p.mu.Unlock()
+	// 	c.Close()
+	// 	fmt.Println("[Push] not alive")
+	// 	return
+	// }
 	select {
 	case p.ClientPool <- c:
 		p.mu.Lock()
