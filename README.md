@@ -49,7 +49,7 @@ golang redis client, bufferd connection, connection pool
 >		key := "myhashes"
 >		c = mp.PopByKey(key)
 >		mp.PushByKey(key, c)
->	push key based on a Hash Algorithm. You can change your hash Algorithm.
+>	PopByKey and PushByKey based on a Hash Algorithm. You can change your hash Algorithm.
 >	The Hash code is implemented in Sum function.
 
 #### Todo List
