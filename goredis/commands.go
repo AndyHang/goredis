@@ -4,6 +4,7 @@ package msgredis
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -127,6 +128,184 @@ func (c *Conn) KEYS(pattern string) ([][]byte, error) {
 	return members, nil
 }
 
+func (c *Conn) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLACE bool) (bool, error) {
+	args := make([]interface{}, 5)
+	args[0] = host
+	args[1] = port
+	args[2] = key
+	args[3] = destDB
+	args[4] = timeout
+	if COPY {
+		args = append(args, "COPY")
+	}
+	if REPLACE {
+		args = append(args, "REPLACE")
+	}
+	v, e := c.Call("MIGRAGE", args...)
+	if e != nil {
+		return false, e
+	}
+	r, ok := v.([]byte)
+	if !ok {
+		return false, errors.New("invaild response type")
+	}
+
+	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
+		return true, nil
+	}
+	return false, errors.New("migrate false")
+}
+
+func (c *Conn) SELECT(index int) ([]byte, error) {
+	v, e := c.Call("SELECT", index)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) MOVE(key, db string) (bool, error) {
+	n, e := c.Call("MOVE", key, db)
+	if e != nil {
+		return false, e
+	}
+	r := n.(int64)
+	if r == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Conn) OBJECT() {}
+
+func (c *Conn) PERSIST(key string) (bool, error) {
+	n, e := c.Call("PERSIST", key)
+	if e != nil {
+		return false, e
+	}
+	r := n.(int64)
+	if r == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Conn) PEXPIRE(key string, milliseconds int64) (bool, error) {
+	n, e := c.Call("EXPIRE", key, milliseconds)
+	if e != nil {
+		return false, e
+	}
+
+	r := n.(int64)
+	if r == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Conn) PEXPIREAT(key string, milliTimestamp int) (bool, error) {
+	n, e := c.Call("EXPIREAT", key, milliTimestamp)
+	if e != nil {
+		return false, e
+	}
+
+	r := n.(int64)
+	if r == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Conn) PTTL(key string) (int64, error) {
+	n, e := c.Call("PTTL", key)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) RANDOMKEY() ([]byte, error) {
+	v, e := c.Call("RANDOMKEY")
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrEmptyDB
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) RENAME(key, newkey string) ([]byte, error) {
+	v, e := c.Call("RENAME", key, newkey)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) RENAMENX(key, newkey string) (bool, error) {
+	n, e := c.Call("RENAMENX", key, newkey)
+	if e != nil {
+		return false, e
+	}
+	r := n.(int64)
+	if r == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// with dump
+func (c *Conn) RESTORE(key string, ttl int, serializedValue string) (bool, error) {
+	v, e := c.Call("RESTORE", key, ttl, serializedValue)
+	if e != nil {
+		return false, e
+	}
+	r := v.([]byte)
+	if len(r) == 2 && r[0] == 'O' && r[1] == 'K' {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Conn) SORT() {}
+
+func (c *Conn) TTL(key string) (int64, error) {
+	n, e := c.Call("TTL", key)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) TYPE(key string) ([]byte, error) {
+	v, e := c.Call("TYPE", key)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) SCAN(cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+	args := make([]interface{}, 0, 5)
+	args = append(args, cursor)
+	if match {
+		args = append(args, "MATCH", pattern)
+	}
+	if isCount {
+		args = append(args, "COUNT", count)
+	}
+	v, e := c.Call("SCAN", args...)
+	if e != nil {
+		return 0, nil, e
+	}
+
+	r := v.([]interface{})
+	// return cursor
+	rCursor, _ := strconv.Atoi(string(r[0].([]byte)))
+	return rCursor, r[1].([]interface{}), nil
+}
+
 /******************* sets commands *******************/
 func (c *Conn) SADD(key string, values []string) (int64, error) {
 	args := make([]interface{}, len(values)+1)
@@ -155,7 +334,7 @@ func (c *Conn) SREM(key string, values []string) (int64, error) {
 }
 
 func (c *Conn) SISMEMBER(key, value string) (int64, error) {
-	v, e := c.Call("SCARD", key, value)
+	v, e := c.Call("SISMEMBER", key, value)
 	if e != nil {
 		return 0, e
 	}
@@ -271,7 +450,7 @@ func (c *Conn) SRANDMEMBER(key string, count int) ([][]byte, error) {
 		members[0] = v.([]byte)
 		return members, nil
 	}
-	v, e := c.Call("SRANDMEMBER", key)
+	v, e := c.Call("SRANDMEMBER", key, count)
 	if e != nil {
 		return nil, e
 	}
@@ -315,11 +494,6 @@ func (c *Conn) SUNIONSTORE(key string, keys []string) (int64, error) {
 	}
 	return n.(int64), nil
 }
-
-// available since redis 2.8.0
-// func (c *Conn) SSCAN(key string, cursor int) (int64, [][]byte, error) {
-
-// }
 
 /******************* strings commands *******************/
 func (c *Conn) APPEND(key, value string) (int64, error) {
@@ -534,7 +708,25 @@ func (c *Conn) STRLEN(key string) (int64, error) {
 	return v.(int64), e
 }
 
-func (c *Conn) SSCAN(key string) {}
+func (c *Conn) SSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+	args := make([]interface{}, 0, 6)
+	args = append(args, key, cursor)
+	if match {
+		args = append(args, "MATCH", pattern)
+	}
+	if isCount {
+		args = append(args, "COUNT", count)
+	}
+	v, e := c.Call("SSCAN", args...)
+	if e != nil {
+		return 0, nil, e
+	}
+
+	r := v.([]interface{})
+	// return cursor
+	rCursor, _ := strconv.Atoi(string(r[0].([]byte)))
+	return rCursor, r[1].([]interface{}), nil
+}
 
 /******************* hashes commands *******************/
 func (c *Conn) HDEL(key string, fields []string) (int64, error) {
@@ -681,7 +873,25 @@ func (c *Conn) HVALS(key string) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) HSCAN() {}
+func (c *Conn) HSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+	args := make([]interface{}, 0, 6)
+	args = append(args, key, cursor)
+	if match {
+		args = append(args, "MATCH", pattern)
+	}
+	if isCount {
+		args = append(args, "COUNT", count)
+	}
+	v, e := c.Call("HSCAN", args...)
+	if e != nil {
+		return 0, nil, e
+	}
+
+	r := v.([]interface{})
+	// return cursor
+	rCursor, _ := strconv.Atoi(string(r[0].([]byte)))
+	return rCursor, r[1].([]interface{}), nil
+}
 
 /******************* lists commands *******************/
 func (c *Conn) BLPOP(keys []string, timeout int) ([]interface{}, error) {
@@ -867,21 +1077,305 @@ func (c *Conn) RPUSHX(key, value string) (int64, error) {
 }
 
 /******************* sorted sets commands *******************/
-func (c *Conn) ZADD()             {}
-func (c *Conn) ZCARD()            {}
-func (c *Conn) ZCOUNT()           {}
-func (c *Conn) ZINCRBY()          {}
-func (c *Conn) ZINTERSTORE()      {}
-func (c *Conn) ZLEXCOUNT()        {}
-func (c *Conn) ZRANGE()           {}
-func (c *Conn) ZRANGEBYLEX()      {}
-func (c *Conn) ZREVRANGEBYLEX()   {}
-func (c *Conn) ZRANGEBYSCORE()    {}
-func (c *Conn) ZRANK()            {}
-func (c *Conn) ZREM()             {}
-func (c *Conn) ZREMRANGEBYLEX()   {}
-func (c *Conn) ZREMRANGEBYSCORE() {}
-func (c *Conn) ZREVRANK()         {}
-func (c *Conn) ZSCORE()           {}
-func (c *Conn) ZUNIONSTORE()      {}
-func (c *Conn) ZSCAN()            {}
+func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) {
+	args := make([]interface{}, 1+2*len(keyScore))
+	args[0] = key
+	i := 1
+	for k, s := range keyScore {
+		args[i] = s
+		args[i+1] = k
+		i = i + 2
+	}
+	n, e := c.Call("ZADD", args...)
+	if e != nil {
+		return -1, nil
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) ZCARD(key string) (int64, error) {
+	n, e := c.Call("ZCARD", key)
+	if e != nil {
+		return -1, nil
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) ZCOUNT(key string, min, max float64) (int64, error) {
+	n, e := c.Call("ZCOUNT", key, min, max)
+	if e != nil {
+		return -1, nil
+	}
+	return n.(int64), nil
+}
+
+// increment could be int, float ,string
+func (c *Conn) ZINCRBY(key string, increment interface{}, member string) ([]byte, error) {
+	v, e := c.Call("ZINCRBY", key, increment, member)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weights bool, ws []int, aggregate bool, ag string) (int64, error) {
+	args := make([]interface{}, 2+numkeys)
+	args[0] = destination
+	args[1] = numkeys
+	if len(keys) < numkeys {
+		return -1, ErrBadArgs
+	}
+	for i := 0; i < numkeys; i++ {
+		args[i+2] = keys[i]
+	}
+	if weights == true {
+		if len(ws) < numkeys {
+			return -1, ErrBadArgs
+		}
+		args = append(args, "WEIGHTS")
+		for i := 0; i < numkeys; i++ {
+			args = append(args, ws[i])
+		}
+	}
+
+	if aggregate == true {
+		args = append(args, "AGGREGATE", ag)
+	}
+	n, e := c.Call("ZINTERSTORE", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+// since 2.8.9
+// func (c *Conn) ZLEXCOUNT(key, min, max string) (int64, error) {
+// 	n, e := c.Call("ZLEXCOUNT", key, min, max)
+// 	if e != nil {
+// 		return -1, e
+// 	}
+// 	return n.(int64), nil
+// }
+
+func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
+	if withscores == true {
+		v, e := c.Call("ZRANGE", key, start, stop, "WITHSCORES")
+		if e != nil {
+			return nil, e
+		}
+		return v.([]interface{}), nil
+	}
+	v, e := c.Call("ZRANGE", key, start, stop)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]interface{}), nil
+}
+
+// since 2.8.9
+// func (c *Conn) ZRANGEBYLEX(key, min, max string, limit bool, offset, count int) ([]interface{}, error) {
+// 	args := make([]interface{}, 3)
+// 	args[0] = key
+// 	args[1] = min
+// 	args[2] = max
+// 	if limit {
+// 		args = append(args, "LIMIT", offset, count)
+// 	}
+// 	v, e := c.Call("ZRANGEBYLEX", args...)
+// 	if e != nil {
+// 		return nil, e
+// 	}
+// 	return v.([]interface{}), nil
+// }
+
+// 2.8.9
+// func (c *Conn) ZREVRANGEBYLEX(key, max, min string, limit bool, offset, count int) ([]interface{}, error) {
+// 	args := make([]interface{}, 3)
+// 	args[0] = key
+// 	args[1] = max
+// 	args[2] = min
+// 	if limit {
+// 		args = append(args, "LIMIT", offset, count)
+// 	}
+// 	v, e := c.Call("ZREVRANGEBYLEX", args...)
+// 	if e != nil {
+// 		return nil, e
+// 	}
+// 	return v.([]interface{}), nil
+// }
+
+func (c *Conn) ZRANGEBYSCORE(key string, min, max interface{}, withScores, limit bool, offset, count interface{}) ([]interface{}, error) {
+	args := make([]interface{}, 3)
+	args[0] = key
+	args[1] = min
+	args[2] = max
+	if withScores {
+		args = append(args, "WITHSCORES")
+	}
+	if limit {
+		args = append(args, "LIMIT", offset, count)
+	}
+	v, e := c.Call("ZRANGEBYSCORE", args...)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]interface{}), nil
+}
+
+// if key,or member not exists return bulk string nil, else return integer
+func (c *Conn) ZRANK(key, member string) (int64, error) {
+	n, e := c.Call("ZRANK", key, member)
+	if e != nil {
+		return -1, e
+	}
+	if _, ok := n.(int64); ok {
+		return n.(int64), nil
+	}
+
+	return -1, ErrKeyNotExist
+}
+
+func (c *Conn) ZREM(key string, members []string) (int64, error) {
+	args := make([]interface{}, 1+len(members))
+	args[0] = key
+	i := 1
+	for _, m := range members {
+		args[i] = m
+		i++
+	}
+	n, e := c.Call("ZREM", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+// since 2.8.9
+// func (c *Conn) ZREMRANGEBYLEX(key, min, max string) (int64, error) {
+// 	n, e := c.Call("ZREMRANGEBYLEX", key, min, max)
+// 	if e != nil {
+// 		return -1, e
+// 	}
+// 	return n.(int64), nil
+// }
+
+func (c *Conn) ZREMRANGEBYRANK(key string, min, max interface{}) (int64, error) {
+	n, e := c.Call("ZREMRANGEBYRANK", key, min, max)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) ZREMRANGEBYSCORE(key string, min, max interface{}) (int64, error) {
+	n, e := c.Call("ZREMRANGEBYSCORE", key, min, max)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) ZREVRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
+	if withscores == true {
+		v, e := c.Call("ZREVRANGE", key, start, stop, "WITHSCORES")
+		if e != nil {
+			return nil, e
+		}
+		return v.([]interface{}), nil
+	}
+	v, e := c.Call("ZREVRANGE", key, start, stop)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]interface{}), nil
+}
+
+func (c *Conn) ZREVRANGEBYSCORE(key string, max, min interface{}, withScores, limit bool, offset, count interface{}) ([]interface{}, error) {
+	args := make([]interface{}, 3)
+	args[0] = key
+	args[1] = max
+	args[2] = min
+	if withScores {
+		args = append(args, "WITHSCORES")
+	}
+	if limit {
+		args = append(args, "LIMIT", offset, count)
+	}
+	v, e := c.Call("ZREVRANGEBYSCORE", args...)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]interface{}), nil
+}
+
+func (c *Conn) ZREVRANK(key, member string) (int64, error) {
+	n, e := c.Call("ZREVRANK", key, member)
+	if e != nil {
+		return -1, e
+	}
+	if _, ok := n.(int64); ok {
+		return n.(int64), nil
+	}
+
+	return -1, ErrKeyNotExist
+}
+
+func (c *Conn) ZSCORE(key, member string) ([]byte, error) {
+	v, e := c.Call("ZSCORE", key, member)
+	if e != nil {
+		return nil, e
+	}
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) ZUNIONSTORE(destination string, numkeys int, keys []string, weights bool, ws []int, aggregate bool, ag string) (int64, error) {
+	args := make([]interface{}, 2+numkeys)
+	args[0] = destination
+	args[1] = numkeys
+	if len(keys) < numkeys {
+		return -1, ErrBadArgs
+	}
+	for i := 0; i < numkeys; i++ {
+		args[i+2] = keys[i]
+	}
+	if weights == true {
+		if len(ws) < numkeys {
+			return -1, ErrBadArgs
+		}
+		args = append(args, "WEIGHTS")
+		for i := 0; i < numkeys; i++ {
+			args = append(args, ws[i])
+		}
+	}
+
+	if aggregate == true {
+		args = append(args, "AGGREGATE", ag)
+	}
+	n, e := c.Call("ZUNIONSTORE", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+func (c *Conn) ZSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+	args := make([]interface{}, 0, 6)
+	args = append(args, key, cursor)
+	if match {
+		args = append(args, "MATCH", pattern)
+	}
+	if isCount {
+		args = append(args, "COUNT", count)
+	}
+	v, e := c.Call("ZSCAN", args...)
+	if e != nil {
+		return 0, nil, e
+	}
+
+	r := v.([]interface{})
+	// return cursor
+	rCursor, _ := strconv.Atoi(string(r[0].([]byte)))
+	return rCursor, r[1].([]interface{}), nil
+}
