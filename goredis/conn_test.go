@@ -233,14 +233,20 @@ func TestQPS(t *testing.T) {
 		}
 	}()
 
+	go func() {
+		for {
+			fmt.Println("QPSAvg:", p.QPSAvg())
+		}
+	}()
+
 	// select {}
-	time.Sleep(11e9)
+	time.Sleep(15e9)
 }
 
 func call(c *Conn) {
 	for {
 		key := "zyh1009"
-		c.Call("FLUSHDB")
+		// c.Call("FLUSHDB")
 		c.GET(key)
 		c.SET(key, "zyh1009")
 		c.GET(key)
