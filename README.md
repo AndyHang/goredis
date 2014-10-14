@@ -12,6 +12,25 @@ golang redis client, bufferd connection, connection pool
 >
 >	If redis do not need AUTH, password =""
 
+####	A Redis Command.
+>		c.GET("mykey")
+>		c.SADD("mySets", []string{"a","b","c"})
+>		// You can also use this
+>		c.Call(CommandName, arg...)
+
+####	Pipeline
+>		c.PipeSend("SET", "a", "zyh")
+>		c.PipeSend("SET", "b", "zyh")
+>		c.PipeSend("SET", "c", "zyh")
+>		c.PipeExec()
+
+###		Transaction
+>		c.MULTI()
+>		c.TransSend("SET", "a", "zyh2")
+>		c.TransSend("SET", "b", "zyh3")
+>		c.TransExec()
+
+
 ####	Create a new pool?
 >		p := NewPool("127.0.0.1:6379", "")
 >		// get a new conn
@@ -32,3 +51,7 @@ golang redis client, bufferd connection, connection pool
 >		mp.PushByKey(key, c)
 >	push key based on a Hash Algorithm. You can change your hash Algorithm.
 >	The Hash code is implemented in Sum function.
+
+#### Todo List
++	Consistent Hash
++	Etc...
