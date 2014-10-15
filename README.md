@@ -32,7 +32,7 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 
 
 ####	Create a new pool?
->		p := NewPool("127.0.0.1:6379", "")
+>		p := NewPool("127.0.0.1:6379", "", maxConnNum, maxIdleSeconds)
 >		// get a new conn
 >		c := p.Pop()  
 >		if c == nil{
@@ -42,7 +42,8 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 
 ####	Create a new multiPool?
 >		addresses := []string{"127.0.0.1:6379", "127.0.0.1:9991@1"}
->		mp := NewMultiPool(addresses)
+>		mp := NewMultiPool(addresses, maxConnNum, maxIdleSeconds)
+>		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
 >		addr := "127.0.0.1:6379"
 >		c := mp.PopByAddr(addr)
 >		mp.PushByAddr(addr, c)
@@ -51,6 +52,8 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >		mp.PushByKey(key, c)
 >	PopByKey and PushByKey based on a Hash Algorithm. You can change your hash Algorithm.
 >	The Hash code is implemented in Sum function.
+>	AddPool is for a new pool in multiPool that have different maxConnNum and maxIdleSeconds configuration.
+>	Note: AddPool must call before use the multiPool, because the map inside multiPool have no mutex.
 
 #### Todo List
 +	Consistent Hash
