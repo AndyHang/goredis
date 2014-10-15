@@ -26,6 +26,3 @@ package msgRedis
 // 5 读到了错误字符，会不会有没有读完的数据
 // 6 内嵌哈希算法 ok
 // 7
-
-// song
-// when we stand together

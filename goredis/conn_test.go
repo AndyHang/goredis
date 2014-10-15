@@ -246,9 +246,11 @@ func TestCommands(t *testing.T) {
 
 func TestQPS(t *testing.T) {
 	p := NewPool("10.16.15.121:9731", "")
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 50; i++ {
 		c := p.Pop()
-		go call(c)
+		if c != nil {
+			go call(c)
+		}
 	}
 
 	go func() {
