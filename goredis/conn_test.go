@@ -7,7 +7,7 @@ import (
 )
 
 func TestCallN(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "")
+	p := NewPool("10.16.15.121:9731", "", 10, 10)
 	c := p.Pop()
 	fmt.Println(c.CallN(2, "HMGET", "a", "a"))
 }
@@ -27,7 +27,7 @@ func TestPipeSmallBuffer(t *testing.T) {
 }
 
 func TestPoolNoAuth(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "")
+	p := NewPool("10.16.15.121:9731", "", 10, 10)
 	connSlice := make([]*Conn, 0, 25)
 	for i := 0; i < 5; i++ {
 		fmt.Println("Active=", p.Actives())
@@ -45,7 +45,7 @@ func TestPoolNoAuth(t *testing.T) {
 }
 
 func TestPoolAuth(t *testing.T) {
-	p := NewPool("10.16.15.121:9991", "1234567890")
+	p := NewPool("10.16.15.121:9991", "1234567890", 10, 10)
 	fmt.Println(p.Actives())
 	fmt.Println(p.Idles())
 	c := p.Pop()
@@ -245,7 +245,7 @@ func TestCommands(t *testing.T) {
 }
 
 func TestQPS(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "")
+	p := NewPool("10.16.15.121:9731", "", 10, 10)
 	for i := 0; i < 50; i++ {
 		c := p.Pop()
 		if c != nil {

@@ -17,16 +17,16 @@ type MultiPool struct {
 }
 
 //
-func NewMultiPool(addresses []string) *MultiPool {
+func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *MultiPool {
 	pools := make(map[string]*Pool, len(addresses))
 	for _, addr := range addresses {
 		addrPass := strings.Split(addr, "@")
 		if len(addrPass) == 2 {
 			// redis need auth
-			pools[addrPass[0]] = NewPool(addrPass[0], addrPass[1])
+			pools[addr] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
 		} else if len(addrPass) == 1 {
 			// redis do not need auth
-			pools[addr] = NewPool(addrPass[0], "")
+			pools[addr] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
 		} else {
 			fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
 		}
@@ -36,6 +36,27 @@ func NewMultiPool(addresses []string) *MultiPool {
 		pools:   pools,
 		servers: addresses,
 	}
+}
+
+func (mp *MultiPool) AddPool(address string, maxConnNum int, maxIdleSeconds int64) bool {
+	addrPass := strings.Split(address, "@")
+	if len(addrPass) == 2 {
+		// redis need auth
+		mp.pools[address] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
+	} else if len(addrPass) == 1 {
+		// redis do not need auth
+		mp.pools[address] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
+	} else {
+		fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+		return false
+	}
+	mp.servers = append(mp.servers, address)
+	return true
+}
+
+// 暂不支持
+func (mp *MultiPool) DelPool() bool {
+	return false
 }
 
 // get conn by address directly
@@ -77,18 +98,21 @@ func (mp *MultiPool) PushByKey(key string, c *Conn) {
 const (
 	// MaxIdleNum     = 20
 	// MaxActiveNum   = 20
-	MaxConnNum     = 50
-	MaxIdleSeconds = 28
+	GMaxConnNum     = 50
+	GMaxIdleSeconds = 28
 )
 
 // connection pool of only one redis server
 type Pool struct {
-	Address    string
-	Password   string
-	IdleNum    int
-	ActiveNum  int
-	ClientPool chan *Conn
-	mu         sync.RWMutex
+	Address   string
+	Password  string
+	IdleNum   int
+	ActiveNum int
+
+	MaxConnNum     int
+	MaxIdleSeconds int64
+	ClientPool     chan *Conn
+	mu             sync.RWMutex
 
 	CallNum int64
 	callMu  sync.RWMutex
@@ -96,13 +120,15 @@ type Pool struct {
 	CallConsume map[string]int
 }
 
-func NewPool(address, password string) *Pool {
+func NewPool(address, password string, maxConnNum int, maxIdleSeconds int64) *Pool {
 	return &Pool{
-		Address:    address,
-		Password:   password,
-		IdleNum:    0,
-		ActiveNum:  0,
-		ClientPool: make(chan *Conn, MaxConnNum),
+		Address:        address,
+		Password:       password,
+		IdleNum:        0,
+		ActiveNum:      0,
+		MaxConnNum:     maxConnNum,
+		MaxIdleSeconds: maxIdleSeconds,
+		ClientPool:     make(chan *Conn, maxConnNum),
 	}
 }
 
@@ -115,7 +141,7 @@ PopLoop:
 		select {
 		case c = <-p.ClientPool:
 			// fmt.Println("[Pop] in case")
-			if time.Now().Unix()-c.lastActiveTime > MaxIdleSeconds {
+			if time.Now().Unix()-c.lastActiveTime > p.MaxIdleSeconds {
 				if c.IsAlive() {
 					p.mu.Lock()
 					p.IdleNum--
@@ -146,7 +172,7 @@ PopLoop:
 		default:
 			// fmt.Println("[Pop] in default")
 			p.mu.RLock()
-			if p.IdleNum+p.ActiveNum >= MaxConnNum {
+			if p.IdleNum+p.ActiveNum >= p.MaxConnNum {
 				p.mu.RUnlock()
 				// fmt.Println("waiting................")
 				if waitSeconds <= 0 {
