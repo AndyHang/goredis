@@ -1364,6 +1364,7 @@ func (c *Conn) ZUNIONSTORE(destination string, numkeys int, keys []string, weigh
 	}
 	return n.(int64), nil
 }
+
 func (c *Conn) ZSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
 	args := make([]interface{}, 0, 6)
 	args = append(args, key, cursor)
@@ -1382,4 +1383,50 @@ func (c *Conn) ZSCAN(key string, cursor int, match bool, pattern string, isCount
 	// return cursor
 	rCursor, _ := strconv.Atoi(string(r[0].([]byte)))
 	return rCursor, r[1].([]interface{}), nil
+}
+
+/******************* hyperLogLog *******************/
+// since 2.8.9
+func (c *Conn) PFADD(key string, elements []string) (int64, error) {
+	args := make([]interface{}, 1+len(elements))
+	args[0] = key
+	i := 1
+	for _, element := range elements {
+		args[i] = element
+		i++
+	}
+	n, e := c.Call("PFADD", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) PFCOUNT(keys []string) (int64, error) {
+	args := make([]interface{}, len(keys))
+	i := 0
+	for _, key := range keys {
+		args[i] = key
+		i++
+	}
+	n, e := c.Call("PFCOUNT", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) PFMERGE(destKey string, sourceKeys []string) (int64, error) {
+	args := make([]interface{}, 1+len(sourceKeys))
+	args[0] = destKey
+	i := 1
+	for _, sourceKey := range sourceKeys {
+		args[i] = sourceKey
+		i++
+	}
+	n, e := c.Call("PFMERGE", args...)
+	if e != nil {
+		return -1, e
+	}
+	return n.([]byte), nil
 }
