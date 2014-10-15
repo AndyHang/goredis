@@ -1,4 +1,4 @@
-package msgredis
+package msgRedis
 
 import (
 	"fmt"
@@ -98,7 +98,31 @@ func TestCommands(t *testing.T) {
 	}
 	defer c.conn.Close()
 
-	fmt.Println(c.KEYS("*dadfjiii*"))
+	fmt.Println("STRINGS.************************STRINGS**********************.STRINGS")
+	fmt.Println(c.SET("key", "value"))
+	fmt.Println(c.OBJECT("encoding", "key"))
+	fmt.Println(c.DEL([]string{"keysa"}))
+	fmt.Println(c.EXISTS("key"))
+	fmt.Println(c.EXPIRE("key", 1000))
+	fmt.Println(c.EXPIREAT("key", time.Now().Unix()+100))
+	fmt.Println(c.KEYS("*"))
+	fmt.Println(c.MIGRATE("10.16.15.121", "9731", "key", "1", 5000, true, true))
+	fmt.Println(c.SELECT(1))
+	fmt.Println(c.MOVE("key", "3"))
+	fmt.Println(c.PERSIST("key"))
+	fmt.Println(c.PEXPIRE("key", 10e6))
+	fmt.Println(c.PEXPIREAT("key", time.Now().Unix()*1000+100000))
+	fmt.Println(c.PTTL("key"))
+	fmt.Println(c.RANDOMKEY())
+	fmt.Println(c.SET("key", "value"))
+	fmt.Println(c.RENAME("key", "newkey"))
+	fmt.Println(c.RENAMENX("newkey", "key"))
+	fmt.Println(c.DUMP("key"))
+	b, _ := c.DUMP("key")
+	fmt.Println(c.RESTORE("key111", 999, string(b)))
+	fmt.Println(c.TTL("key"))
+	fmt.Println(c.TYPE("key"))
+	return
 
 	key := "zyh1009"
 	fmt.Println("STRINGS.************************STRINGS**********************.STRINGS")
@@ -222,7 +246,7 @@ func TestCommands(t *testing.T) {
 
 func TestQPS(t *testing.T) {
 	p := NewPool("10.16.15.121:9731", "")
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 100; i++ {
 		c := p.Pop()
 		go call(c)
 	}

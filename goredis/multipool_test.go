@@ -1,4 +1,4 @@
-package msgredis
+package msgRedis
 
 import (
 	// "fmt"
@@ -14,11 +14,11 @@ func init() {
 }
 
 func TestMultiPool(t *testing.T) {
-	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991@1234567980"}
-	addr := "10.16.15.121:9731"
+	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991@1234567890"}
+	addr := "10.16.15.121:9991"
 	mp := NewMultiPool(addresses)
 	var g sync.WaitGroup
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 10; i++ {
 		g.Add(1)
 		go func() {
 			defer g.Done()

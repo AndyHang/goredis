@@ -1,4 +1,4 @@
-package msgredis
+package msgRedis
 
 import (
 	"bufio"

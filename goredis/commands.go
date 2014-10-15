@@ -1,4 +1,4 @@
-package msgredis
+package msgRedis
 
 // all return integer is int64
 import (
@@ -90,7 +90,7 @@ func (c *Conn) EXISTS(key string) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) EXPIRE(key string, seconds int) (bool, error) {
+func (c *Conn) EXPIRE(key string, seconds int64) (bool, error) {
 	n, e := c.Call("EXPIRE", key, seconds)
 	if e != nil {
 		return false, e
@@ -103,7 +103,7 @@ func (c *Conn) EXPIRE(key string, seconds int) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) EXPIREAT(key string, timestamp int) (bool, error) {
+func (c *Conn) EXPIREAT(key string, timestamp int64) (bool, error) {
 	n, e := c.Call("EXPIREAT", key, timestamp)
 	if e != nil {
 		return false, e
@@ -128,20 +128,9 @@ func (c *Conn) KEYS(pattern string) ([][]byte, error) {
 	return members, nil
 }
 
+// since 2.6.0  COPY and REPLACE will be available in 3.0
 func (c *Conn) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLACE bool) (bool, error) {
-	args := make([]interface{}, 5)
-	args[0] = host
-	args[1] = port
-	args[2] = key
-	args[3] = destDB
-	args[4] = timeout
-	if COPY {
-		args = append(args, "COPY")
-	}
-	if REPLACE {
-		args = append(args, "REPLACE")
-	}
-	v, e := c.Call("MIGRAGE", args...)
+	v, e := c.Call("MIGRATE", host, port, key, destDB, timeout)
 	if e != nil {
 		return false, e
 	}
@@ -176,7 +165,22 @@ func (c *Conn) MOVE(key, db string) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) OBJECT() {}
+func (c *Conn) OBJECT(subcommand, key string) (interface{}, error) {
+	v, e := c.Call("OBJECT", subcommand, key)
+	if e != nil {
+		return nil, e
+	}
+
+	if v == nil {
+		return nil, ErrKeyNotExist
+	}
+
+	if _, ok := v.(int64); ok {
+		return v.(int64), nil
+	}
+
+	return v.([]byte), nil
+}
 
 func (c *Conn) PERSIST(key string) (bool, error) {
 	n, e := c.Call("PERSIST", key)
@@ -203,7 +207,7 @@ func (c *Conn) PEXPIRE(key string, milliseconds int64) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) PEXPIREAT(key string, milliTimestamp int) (bool, error) {
+func (c *Conn) PEXPIREAT(key string, milliTimestamp int64) (bool, error) {
 	n, e := c.Call("EXPIREAT", key, milliTimestamp)
 	if e != nil {
 		return false, e
