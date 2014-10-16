@@ -1,7 +1,8 @@
 goredis
 =======
 
-golang redis client, bufferd connection, connection pool, support all redis commands
+golang redis client, bufferd connection, connection pool, support all redis commands，
+欢迎大家批评指正，更欢迎大家加入进来。
 
 ####	Create a new conn?
 >		c, e := Dial("127.0.0.1:6379", pwd, CTimeout, RTimeout, WTimeout, alive, *pool)
@@ -76,12 +77,12 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >		rTable[1] = ttl
 >		rTable[2] = key
 >		return rTable
->	`
->	sha1, e := c.SCRIPTLOAD(scriptA)
->	if e != nil {
->		fmt.Println("script load error = ", e.Error())
->		return
->	}
+>		`
+>		sha1, e := c.SCRIPTLOAD(scriptA)
+>		if e != nil {
+>			fmt.Println("script load error = ", e.Error())
+>			return
+>		}
 
 
 #### Todo List
