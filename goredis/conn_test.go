@@ -122,7 +122,7 @@ func TestCommands(t *testing.T) {
 	fmt.Println(c.RESTORE("key111", 999, string(b)))
 	fmt.Println(c.TTL("key"))
 	fmt.Println(c.TYPE("key"))
-	return
+	// return
 
 	key := "zyh1009"
 	fmt.Println("STRINGS.************************STRINGS**********************.STRINGS")
@@ -315,6 +315,58 @@ func call(c *Conn) {
 		c.HVALS(key)
 
 	}
+}
+
+func TestScript(t *testing.T) {
+	p := NewPool("10.16.15.121:9731", "", 10, 10)
+	c := p.Pop()
+	if c == nil {
+		return
+	}
+
+	scriptA := `
+		local n = redis.call("exists",KEYS[1])
+		if n == 1 then
+			redis.call("expire",KEYS[1],ARGV[1])
+		else 
+			redis.call("set", KEYS[1], ARGV[2])
+		end
+
+		local ttl = redis.call("ttl",KEYS[1])
+		local key = redis.call("get",KEYS[1])
+
+		local rTable = {}
+		rTable[1] = ttl
+		rTable[2] = key
+		return rTable
+	`
+	sha1, e := c.SCRIPTLOAD(scriptA)
+	if e != nil {
+		fmt.Println("script load error = ", e.Error())
+		return
+	}
+
+	sha := string(sha1)
+
+	p.AddScriptSha1("true", sha)
+	fmt.Println("script sha1 = ", sha)
+
+	v, e := c.EVAL(scriptA, 1, []string{"luaKey"}, []string{"123", "luaValue"})
+	if e != nil {
+		fmt.Println("eval = ", e.Error())
+		return
+	}
+	fmt.Println("EVAL = ", v)
+	return
+	v, e = c.EVALSHA(p.GetScriptSha1("true"), 1, []string{"luaKey"}, []string{"123", "luaValue"})
+	if e != nil {
+		fmt.Println("evalsha = ", e.Error())
+		return
+	}
+	fmt.Println("EVALSHA = ", v)
+	fmt.Println(c.SCRIPTEXISTS([]string{sha, "avd"}))
+	fmt.Println(c.SCRIPTKILL())
+	fmt.Println(c.SCRIPTFLUSH())
 }
 
 func TestSCAN(t *testing.T) {

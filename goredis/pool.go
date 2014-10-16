@@ -104,20 +104,22 @@ const (
 
 // connection pool of only one redis server
 type Pool struct {
-	Address   string
-	Password  string
-	IdleNum   int
-	ActiveNum int
-
+	Address        string
+	Password       string
+	IdleNum        int
+	ActiveNum      int
 	MaxConnNum     int
 	MaxIdleSeconds int64
-	ClientPool     chan *Conn
-	mu             sync.RWMutex
+
+	ClientPool chan *Conn
+	mu         sync.RWMutex
 
 	CallNum int64
 	callMu  sync.RWMutex
 
-	CallConsume map[string]int
+	ScriptMap map[string]string
+
+	CallConsume map[string]int // 命令消耗时长
 }
 
 func NewPool(address, password string, maxConnNum int, maxIdleSeconds int64) *Pool {
@@ -129,6 +131,7 @@ func NewPool(address, password string, maxConnNum int, maxIdleSeconds int64) *Po
 		MaxConnNum:     maxConnNum,
 		MaxIdleSeconds: maxIdleSeconds,
 		ClientPool:     make(chan *Conn, maxConnNum),
+		ScriptMap:      make(map[string]string, 1),
 	}
 }
 
@@ -286,6 +289,28 @@ func (p *Pool) QPSAvg() int64 {
 	}
 	qps[3] = (qps[0] + qps[1] + qps[2]) / 3
 	return qps[3]
+}
+
+func (p *Pool) AddScriptSha1(name, script string) {
+	p.mu.Lock()
+	p.ScriptMap[name] = script
+	p.mu.Unlock()
+}
+
+func (p *Pool) DelScriptSha1(name string) {
+	p.mu.Lock()
+	delete(p.ScriptMap, name)
+	p.mu.Unlock()
+}
+
+func (p *Pool) GetScriptSha1(name string) string {
+	sha1 := ""
+	p.mu.RLock()
+	if _, ok := p.ScriptMap[name]; ok {
+		sha1 = p.ScriptMap[name]
+	}
+	p.mu.RUnlock()
+	return sha1
 }
 
 // 哈希算法

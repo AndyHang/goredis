@@ -17,7 +17,8 @@ const (
 	WriteTimeout      = 60e9
 	DefaultBufferSize = 64
 
-	RetryWaitSeconds = 2e9
+	RetryWaitSeconds = time.Second
+	RetryTimes       = 2
 
 	TypeError        = '-'
 	TypeSimpleString = '+'
@@ -112,6 +113,7 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 			}
 			continue
 		}
+		break
 	}
 	return ret, e
 }

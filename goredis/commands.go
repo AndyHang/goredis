@@ -8,8 +8,9 @@ import (
 	"strings"
 )
 
+/******************* connections *******************/
 func (c *Conn) AUTH(password string) (bool, error) {
-	v, e := c.Call("AUTH", password)
+	v, e := c.CallN(RetryTimes, "AUTH", password)
 	if e != nil {
 		fmt.Println("AUTH failed:" + e.Error())
 		return false, e
@@ -26,8 +27,12 @@ func (c *Conn) AUTH(password string) (bool, error) {
 	return false, errors.New("invaild response string:" + string(r))
 }
 
+func (c *Conn) QUIT() {
+
+}
+
 func (c *Conn) IsAlive() bool {
-	v, e := c.Call("PING")
+	v, e := c.CallN(RetryTimes, "PING")
 	if e != nil {
 		return false
 	}
@@ -42,7 +47,7 @@ func (c *Conn) IsAlive() bool {
 }
 
 func (c *Conn) Info() ([]byte, error) {
-	v, e := c.Call("INFO")
+	v, e := c.CallN(RetryTimes, "INFO")
 	if e != nil {
 		return nil, e
 	}
@@ -59,7 +64,7 @@ func (c *Conn) DEL(keys []string) (int64, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
 	}
-	n, e := c.Call("DEL", args...)
+	n, e := c.CallN(RetryTimes, "DEL", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -67,7 +72,7 @@ func (c *Conn) DEL(keys []string) (int64, error) {
 }
 
 func (c *Conn) DUMP(key string) ([]byte, error) {
-	v, e := c.Call("DUMP", key)
+	v, e := c.CallN(RetryTimes, "DUMP", key)
 	if e != nil {
 		return nil, e
 	}
@@ -78,7 +83,7 @@ func (c *Conn) DUMP(key string) ([]byte, error) {
 }
 
 func (c *Conn) EXISTS(key string) (bool, error) {
-	n, e := c.Call("EXISTS", key)
+	n, e := c.CallN(RetryTimes, "EXISTS", key)
 	if e != nil {
 		return false, e
 	}
@@ -91,7 +96,7 @@ func (c *Conn) EXISTS(key string) (bool, error) {
 }
 
 func (c *Conn) EXPIRE(key string, seconds int64) (bool, error) {
-	n, e := c.Call("EXPIRE", key, seconds)
+	n, e := c.CallN(RetryTimes, "EXPIRE", key, seconds)
 	if e != nil {
 		return false, e
 	}
@@ -104,7 +109,7 @@ func (c *Conn) EXPIRE(key string, seconds int64) (bool, error) {
 }
 
 func (c *Conn) EXPIREAT(key string, timestamp int64) (bool, error) {
-	n, e := c.Call("EXPIREAT", key, timestamp)
+	n, e := c.CallN(RetryTimes, "EXPIREAT", key, timestamp)
 	if e != nil {
 		return false, e
 	}
@@ -117,7 +122,7 @@ func (c *Conn) EXPIREAT(key string, timestamp int64) (bool, error) {
 }
 
 func (c *Conn) KEYS(pattern string) ([][]byte, error) {
-	v, e := c.Call("KEYS", pattern)
+	v, e := c.CallN(RetryTimes, "KEYS", pattern)
 	if e != nil {
 		return nil, e
 	}
@@ -130,7 +135,7 @@ func (c *Conn) KEYS(pattern string) ([][]byte, error) {
 
 // since 2.6.0  COPY and REPLACE will be available in 3.0
 func (c *Conn) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLACE bool) (bool, error) {
-	v, e := c.Call("MIGRATE", host, port, key, destDB, timeout)
+	v, e := c.CallN(RetryTimes, "MIGRATE", host, port, key, destDB, timeout)
 	if e != nil {
 		return false, e
 	}
@@ -146,7 +151,7 @@ func (c *Conn) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLAC
 }
 
 func (c *Conn) SELECT(index int) ([]byte, error) {
-	v, e := c.Call("SELECT", index)
+	v, e := c.CallN(RetryTimes, "SELECT", index)
 	if e != nil {
 		return nil, e
 	}
@@ -154,7 +159,7 @@ func (c *Conn) SELECT(index int) ([]byte, error) {
 }
 
 func (c *Conn) MOVE(key, db string) (bool, error) {
-	n, e := c.Call("MOVE", key, db)
+	n, e := c.CallN(RetryTimes, "MOVE", key, db)
 	if e != nil {
 		return false, e
 	}
@@ -166,7 +171,7 @@ func (c *Conn) MOVE(key, db string) (bool, error) {
 }
 
 func (c *Conn) OBJECT(subcommand, key string) (interface{}, error) {
-	v, e := c.Call("OBJECT", subcommand, key)
+	v, e := c.CallN(RetryTimes, "OBJECT", subcommand, key)
 	if e != nil {
 		return nil, e
 	}
@@ -183,7 +188,7 @@ func (c *Conn) OBJECT(subcommand, key string) (interface{}, error) {
 }
 
 func (c *Conn) PERSIST(key string) (bool, error) {
-	n, e := c.Call("PERSIST", key)
+	n, e := c.CallN(RetryTimes, "PERSIST", key)
 	if e != nil {
 		return false, e
 	}
@@ -195,7 +200,7 @@ func (c *Conn) PERSIST(key string) (bool, error) {
 }
 
 func (c *Conn) PEXPIRE(key string, milliseconds int64) (bool, error) {
-	n, e := c.Call("EXPIRE", key, milliseconds)
+	n, e := c.CallN(RetryTimes, "EXPIRE", key, milliseconds)
 	if e != nil {
 		return false, e
 	}
@@ -208,7 +213,7 @@ func (c *Conn) PEXPIRE(key string, milliseconds int64) (bool, error) {
 }
 
 func (c *Conn) PEXPIREAT(key string, milliTimestamp int64) (bool, error) {
-	n, e := c.Call("EXPIREAT", key, milliTimestamp)
+	n, e := c.CallN(RetryTimes, "EXPIREAT", key, milliTimestamp)
 	if e != nil {
 		return false, e
 	}
@@ -221,7 +226,7 @@ func (c *Conn) PEXPIREAT(key string, milliTimestamp int64) (bool, error) {
 }
 
 func (c *Conn) PTTL(key string) (int64, error) {
-	n, e := c.Call("PTTL", key)
+	n, e := c.CallN(RetryTimes, "PTTL", key)
 	if e != nil {
 		return -1, e
 	}
@@ -229,7 +234,7 @@ func (c *Conn) PTTL(key string) (int64, error) {
 }
 
 func (c *Conn) RANDOMKEY() ([]byte, error) {
-	v, e := c.Call("RANDOMKEY")
+	v, e := c.CallN(RetryTimes, "RANDOMKEY")
 	if e != nil {
 		return nil, e
 	}
@@ -240,7 +245,7 @@ func (c *Conn) RANDOMKEY() ([]byte, error) {
 }
 
 func (c *Conn) RENAME(key, newkey string) ([]byte, error) {
-	v, e := c.Call("RENAME", key, newkey)
+	v, e := c.CallN(RetryTimes, "RENAME", key, newkey)
 	if e != nil {
 		return nil, e
 	}
@@ -248,7 +253,7 @@ func (c *Conn) RENAME(key, newkey string) ([]byte, error) {
 }
 
 func (c *Conn) RENAMENX(key, newkey string) (bool, error) {
-	n, e := c.Call("RENAMENX", key, newkey)
+	n, e := c.CallN(RetryTimes, "RENAMENX", key, newkey)
 	if e != nil {
 		return false, e
 	}
@@ -261,7 +266,7 @@ func (c *Conn) RENAMENX(key, newkey string) (bool, error) {
 
 // with dump
 func (c *Conn) RESTORE(key string, ttl int, serializedValue string) (bool, error) {
-	v, e := c.Call("RESTORE", key, ttl, serializedValue)
+	v, e := c.CallN(RetryTimes, "RESTORE", key, ttl, serializedValue)
 	if e != nil {
 		return false, e
 	}
@@ -275,7 +280,7 @@ func (c *Conn) RESTORE(key string, ttl int, serializedValue string) (bool, error
 func (c *Conn) SORT() {}
 
 func (c *Conn) TTL(key string) (int64, error) {
-	n, e := c.Call("TTL", key)
+	n, e := c.CallN(RetryTimes, "TTL", key)
 	if e != nil {
 		return -1, e
 	}
@@ -283,7 +288,7 @@ func (c *Conn) TTL(key string) (int64, error) {
 }
 
 func (c *Conn) TYPE(key string) ([]byte, error) {
-	v, e := c.Call("TYPE", key)
+	v, e := c.CallN(RetryTimes, "TYPE", key)
 	if e != nil {
 		return nil, e
 	}
@@ -299,7 +304,7 @@ func (c *Conn) SCAN(cursor int, match bool, pattern string, isCount bool, count 
 	if isCount {
 		args = append(args, "COUNT", count)
 	}
-	v, e := c.Call("SCAN", args...)
+	v, e := c.CallN(RetryTimes, "SCAN", args...)
 	if e != nil {
 		return 0, nil, e
 	}
@@ -317,7 +322,7 @@ func (c *Conn) SADD(key string, values []string) (int64, error) {
 	for i := 0; i < len(values); i++ {
 		args[i+1] = values[i]
 	}
-	n, e := c.Call("SADD", args...)
+	n, e := c.CallN(RetryTimes, "SADD", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -330,7 +335,7 @@ func (c *Conn) SREM(key string, values []string) (int64, error) {
 	for i := 0; i < len(values); i++ {
 		args[i+1] = values[i]
 	}
-	n, e := c.Call("SREM", args...)
+	n, e := c.CallN(RetryTimes, "SREM", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -338,7 +343,7 @@ func (c *Conn) SREM(key string, values []string) (int64, error) {
 }
 
 func (c *Conn) SISMEMBER(key, value string) (int64, error) {
-	v, e := c.Call("SISMEMBER", key, value)
+	v, e := c.CallN(RetryTimes, "SISMEMBER", key, value)
 	if e != nil {
 		return 0, e
 	}
@@ -346,7 +351,7 @@ func (c *Conn) SISMEMBER(key, value string) (int64, error) {
 }
 
 func (c *Conn) SMEMBERS(key string) ([][]byte, error) {
-	v, e := c.Call("SMEMBERS", key)
+	v, e := c.CallN(RetryTimes, "SMEMBERS", key)
 	if e != nil {
 		return nil, e
 	}
@@ -359,7 +364,7 @@ func (c *Conn) SMEMBERS(key string) ([][]byte, error) {
 
 // 0说明key不存在
 func (c *Conn) SCARD(key string) (int64, error) {
-	v, e := c.Call("SCARD", key)
+	v, e := c.CallN(RetryTimes, "SCARD", key)
 	if e != nil {
 		return 0, e
 	}
@@ -371,7 +376,7 @@ func (c *Conn) SINTER(keys []string) ([][]byte, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
 	}
-	v, e := c.Call("SINTER", args...)
+	v, e := c.CallN(RetryTimes, "SINTER", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -388,7 +393,7 @@ func (c *Conn) SINTERSTORE(key string, keys []string) (int64, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i+1] = keys[i]
 	}
-	n, e := c.Call("SINTERSTORE", args...)
+	n, e := c.CallN(RetryTimes, "SINTERSTORE", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -400,7 +405,7 @@ func (c *Conn) SDIFF(keys []string) ([][]byte, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
 	}
-	v, e := c.Call("SDIFF", args...)
+	v, e := c.CallN(RetryTimes, "SDIFF", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -417,7 +422,7 @@ func (c *Conn) SDIFFSTORE(key string, keys []string) (int64, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i+1] = keys[i]
 	}
-	n, e := c.Call("SDIFFSTORE", args...)
+	n, e := c.CallN(RetryTimes, "SDIFFSTORE", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -426,7 +431,7 @@ func (c *Conn) SDIFFSTORE(key string, keys []string) (int64, error) {
 
 // TODO:return bool
 func (c *Conn) SMOVE(srcKey, desKey, member string) (int64, error) {
-	n, e := c.Call("SMOVE", srcKey, desKey, member)
+	n, e := c.CallN(RetryTimes, "SMOVE", srcKey, desKey, member)
 	if e != nil {
 		return -1, e
 	}
@@ -434,7 +439,7 @@ func (c *Conn) SMOVE(srcKey, desKey, member string) (int64, error) {
 }
 
 func (c *Conn) SPOP(key string) ([]byte, error) {
-	v, e := c.Call("SPOP", key)
+	v, e := c.CallN(RetryTimes, "SPOP", key)
 	if e != nil {
 		return nil, e
 	}
@@ -446,7 +451,7 @@ func (c *Conn) SPOP(key string) ([]byte, error) {
 
 func (c *Conn) SRANDMEMBER(key string, count int) ([][]byte, error) {
 	if count == 0 {
-		v, e := c.Call("SRANDMEMBER", key)
+		v, e := c.CallN(RetryTimes, "SRANDMEMBER", key)
 		if e != nil {
 			return nil, e
 		}
@@ -454,7 +459,7 @@ func (c *Conn) SRANDMEMBER(key string, count int) ([][]byte, error) {
 		members[0] = v.([]byte)
 		return members, nil
 	}
-	v, e := c.Call("SRANDMEMBER", key, count)
+	v, e := c.CallN(RetryTimes, "SRANDMEMBER", key, count)
 	if e != nil {
 		return nil, e
 	}
@@ -475,7 +480,7 @@ func (c *Conn) SUNION(keys []string) ([][]byte, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
 	}
-	v, e := c.Call("SUNION", args...)
+	v, e := c.CallN(RetryTimes, "SUNION", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -492,7 +497,7 @@ func (c *Conn) SUNIONSTORE(key string, keys []string) (int64, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i+1] = keys[i]
 	}
-	n, e := c.Call("SUNIONSTORE", args...)
+	n, e := c.CallN(RetryTimes, "SUNIONSTORE", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -501,7 +506,7 @@ func (c *Conn) SUNIONSTORE(key string, keys []string) (int64, error) {
 
 /******************* strings commands *******************/
 func (c *Conn) APPEND(key, value string) (int64, error) {
-	n, e := c.Call("APPEND", key, value)
+	n, e := c.CallN(RetryTimes, "APPEND", key, value)
 	if e != nil {
 		return -1, e
 	}
@@ -509,7 +514,7 @@ func (c *Conn) APPEND(key, value string) (int64, error) {
 }
 
 func (c *Conn) BITCOUNT(key string) (int64, error) {
-	n, e := c.Call("BITCOUNT", key)
+	n, e := c.CallN(RetryTimes, "BITCOUNT", key)
 	if e != nil {
 		return -1, e
 	}
@@ -524,7 +529,7 @@ func (c *Conn) BITOP(op, dest string, keys []string) (int64, error) {
 	for i := 0; i < len(keys); i++ {
 		args[i+2] = keys[i]
 	}
-	n, e := c.Call("BITOP", args...)
+	n, e := c.CallN(RetryTimes, "BITOP", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -535,7 +540,7 @@ func (c *Conn) BITOP(op, dest string, keys []string) (int64, error) {
 func (c *Conn) BITPOS() {}
 
 func (c *Conn) DECR(key string) (int64, error) {
-	n, e := c.Call("DECR", key)
+	n, e := c.CallN(RetryTimes, "DECR", key)
 	if e != nil {
 		return -1, e
 	}
@@ -543,7 +548,7 @@ func (c *Conn) DECR(key string) (int64, error) {
 }
 
 func (c *Conn) DECRBY(key string, num int) (int64, error) {
-	n, e := c.Call("DECRBY", key, num)
+	n, e := c.CallN(RetryTimes, "DECRBY", key, num)
 	if e != nil {
 		return -1, e
 	}
@@ -551,7 +556,7 @@ func (c *Conn) DECRBY(key string, num int) (int64, error) {
 }
 
 func (c *Conn) INCR(key string) (int64, error) {
-	n, e := c.Call("INCR", key)
+	n, e := c.CallN(RetryTimes, "INCR", key)
 	if e != nil {
 		return -1, e
 	}
@@ -559,7 +564,7 @@ func (c *Conn) INCR(key string) (int64, error) {
 }
 
 func (c *Conn) INCRBY(key string, num int) (int64, error) {
-	n, e := c.Call("INCRBY", key, num)
+	n, e := c.CallN(RetryTimes, "INCRBY", key, num)
 	if e != nil {
 		return -1, e
 	}
@@ -567,7 +572,7 @@ func (c *Conn) INCRBY(key string, num int) (int64, error) {
 }
 
 func (c *Conn) INCRBYFLOAT(key string, f float64) ([]byte, error) {
-	n, e := c.Call("INCRBYFLOAT", key, f)
+	n, e := c.CallN(RetryTimes, "INCRBYFLOAT", key, f)
 	if e != nil {
 		return nil, e
 	}
@@ -575,7 +580,7 @@ func (c *Conn) INCRBYFLOAT(key string, f float64) ([]byte, error) {
 }
 
 func (c *Conn) SET(key, value string) ([]byte, error) {
-	v, e := c.Call("SET", key, value)
+	v, e := c.CallN(RetryTimes, "SET", key, value)
 	if e != nil {
 		return nil, e
 	}
@@ -584,7 +589,7 @@ func (c *Conn) SET(key, value string) ([]byte, error) {
 
 // 应该返回interface还是[]byte?
 func (c *Conn) GET(key string) ([]byte, error) {
-	v, e := c.Call("GET", key)
+	v, e := c.CallN(RetryTimes, "GET", key)
 	if e != nil {
 		return nil, e
 	}
@@ -595,7 +600,7 @@ func (c *Conn) GET(key string) ([]byte, error) {
 }
 
 func (c *Conn) GETBIT(key string, pos int) (int64, error) {
-	n, e := c.Call("GETBIT", key, pos)
+	n, e := c.CallN(RetryTimes, "GETBIT", key, pos)
 	if e != nil {
 		return -1, e
 	}
@@ -603,7 +608,7 @@ func (c *Conn) GETBIT(key string, pos int) (int64, error) {
 }
 
 func (c *Conn) GETRANGE(key string, start, end int) ([]byte, error) {
-	v, e := c.Call("GETRANGE", key, start, end)
+	v, e := c.CallN(RetryTimes, "GETRANGE", key, start, end)
 	if e != nil {
 		return nil, e
 	}
@@ -611,7 +616,7 @@ func (c *Conn) GETRANGE(key string, start, end int) ([]byte, error) {
 }
 
 func (c *Conn) GETSET(key, value string) ([]byte, error) {
-	v, e := c.Call("GETSET", key, value)
+	v, e := c.CallN(RetryTimes, "GETSET", key, value)
 	if e != nil {
 		return nil, e
 	}
@@ -627,7 +632,7 @@ func (c *Conn) MGET(keys []string) ([]interface{}, error) {
 	for k, v := range keys {
 		args[k] = v
 	}
-	v, e := c.Call("MGET", args...)
+	v, e := c.CallN(RetryTimes, "MGET", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -642,7 +647,7 @@ func (c *Conn) MSET(kv map[string]string) ([]byte, error) {
 		args[i+1] = v
 		i = i + 2
 	}
-	v, e := c.Call("MSET", args...)
+	v, e := c.CallN(RetryTimes, "MSET", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -657,7 +662,7 @@ func (c *Conn) MSETNX(kv map[string]string) (int64, error) {
 		args[i+1] = v
 		i = i + 2
 	}
-	v, e := c.Call("MSETNX", args...)
+	v, e := c.CallN(RetryTimes, "MSETNX", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -665,7 +670,7 @@ func (c *Conn) MSETNX(kv map[string]string) (int64, error) {
 }
 
 func (c *Conn) PSETEX(key string, millonseconds int64, value string) ([]byte, error) {
-	v, e := c.Call("PSETEX", key, millonseconds, value)
+	v, e := c.CallN(RetryTimes, "PSETEX", key, millonseconds, value)
 	if e != nil {
 		return nil, e
 	}
@@ -673,7 +678,7 @@ func (c *Conn) PSETEX(key string, millonseconds int64, value string) ([]byte, er
 }
 
 func (c *Conn) SETBIT(key string, pos, value int) (int64, error) {
-	n, e := c.Call("SETBIT", key, pos, value)
+	n, e := c.CallN(RetryTimes, "SETBIT", key, pos, value)
 	if e != nil {
 		return -1, e
 	}
@@ -681,7 +686,7 @@ func (c *Conn) SETBIT(key string, pos, value int) (int64, error) {
 }
 
 func (c *Conn) SETEX(key string, seconds int64, value string) ([]byte, error) {
-	v, e := c.Call("SETEX", key, seconds, value)
+	v, e := c.CallN(RetryTimes, "SETEX", key, seconds, value)
 	if e != nil {
 		return nil, e
 	}
@@ -689,7 +694,7 @@ func (c *Conn) SETEX(key string, seconds int64, value string) ([]byte, error) {
 }
 
 func (c *Conn) SETNX(key, value string) (int64, error) {
-	v, e := c.Call("SETNX", key, value)
+	v, e := c.CallN(RetryTimes, "SETNX", key, value)
 	if e != nil {
 		return -1, e
 	}
@@ -697,7 +702,7 @@ func (c *Conn) SETNX(key, value string) (int64, error) {
 }
 
 func (c *Conn) SETRANGE(key string, offset int, value string) (int64, error) {
-	v, e := c.Call("SETRANGE", key, offset, value)
+	v, e := c.CallN(RetryTimes, "SETRANGE", key, offset, value)
 	if e != nil {
 		return -1, e
 	}
@@ -705,7 +710,7 @@ func (c *Conn) SETRANGE(key string, offset int, value string) (int64, error) {
 }
 
 func (c *Conn) STRLEN(key string) (int64, error) {
-	v, e := c.Call("STRLEN", key)
+	v, e := c.CallN(RetryTimes, "STRLEN", key)
 	if e != nil {
 		return -1, e
 	}
@@ -721,7 +726,7 @@ func (c *Conn) SSCAN(key string, cursor int, match bool, pattern string, isCount
 	if isCount {
 		args = append(args, "COUNT", count)
 	}
-	v, e := c.Call("SSCAN", args...)
+	v, e := c.CallN(RetryTimes, "SSCAN", args...)
 	if e != nil {
 		return 0, nil, e
 	}
@@ -739,7 +744,7 @@ func (c *Conn) HDEL(key string, fields []string) (int64, error) {
 	for i := 0; i < len(fields); i++ {
 		args[i+1] = fields[i]
 	}
-	n, e := c.Call("HDEL", args...)
+	n, e := c.CallN(RetryTimes, "HDEL", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -747,7 +752,7 @@ func (c *Conn) HDEL(key string, fields []string) (int64, error) {
 }
 
 func (c *Conn) HEXISTS(key string, field string) (bool, error) {
-	n, e := c.Call("HEXISTS", key, field)
+	n, e := c.CallN(RetryTimes, "HEXISTS", key, field)
 	if e != nil {
 		return false, e
 	}
@@ -759,7 +764,7 @@ func (c *Conn) HEXISTS(key string, field string) (bool, error) {
 }
 
 func (c *Conn) HGET(key string, field string) ([]byte, error) {
-	v, e := c.Call("HGET", key, field)
+	v, e := c.CallN(RetryTimes, "HGET", key, field)
 	if e != nil {
 		return nil, e
 	}
@@ -770,7 +775,7 @@ func (c *Conn) HGET(key string, field string) ([]byte, error) {
 }
 
 func (c *Conn) HGETALL(key string) ([]interface{}, error) {
-	v, e := c.Call("HGETALL", key)
+	v, e := c.CallN(RetryTimes, "HGETALL", key)
 	if e != nil {
 		return nil, e
 	}
@@ -782,7 +787,7 @@ func (c *Conn) HGETALL(key string) ([]interface{}, error) {
 }
 
 func (c *Conn) HINCRBY(key string, field string, increment int) (int64, error) {
-	n, e := c.Call("HINCRBY", key, field, increment)
+	n, e := c.CallN(RetryTimes, "HINCRBY", key, field, increment)
 	if e != nil {
 		return -1, e
 	}
@@ -790,7 +795,7 @@ func (c *Conn) HINCRBY(key string, field string, increment int) (int64, error) {
 }
 
 func (c *Conn) HINCRBYFLOAT(key string, field string, increment float64) ([]byte, error) {
-	n, e := c.Call("HINCRBYFLOAT", key, field, increment)
+	n, e := c.CallN(RetryTimes, "HINCRBYFLOAT", key, field, increment)
 	if e != nil {
 		return nil, e
 	}
@@ -798,7 +803,7 @@ func (c *Conn) HINCRBYFLOAT(key string, field string, increment float64) ([]byte
 }
 
 func (c *Conn) HKEYS(key string) ([][]byte, error) {
-	v, e := c.Call("HKEYS", key)
+	v, e := c.CallN(RetryTimes, "HKEYS", key)
 	if e != nil {
 		return nil, e
 	}
@@ -813,7 +818,7 @@ func (c *Conn) HKEYS(key string) ([][]byte, error) {
 }
 
 func (c *Conn) HLEN(key string) (int64, error) {
-	n, e := c.Call("HLEN", key)
+	n, e := c.CallN(RetryTimes, "HLEN", key)
 	if e != nil {
 		return -1, e
 	}
@@ -826,7 +831,7 @@ func (c *Conn) HMGET(key string, fields []string) ([]interface{}, error) {
 	for i := 0; i < len(fields); i++ {
 		args[i+1] = fields[i]
 	}
-	v, e := c.Call("HMGET", args...)
+	v, e := c.CallN(RetryTimes, "HMGET", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -846,7 +851,7 @@ func (c *Conn) HMSET(key string, kv map[string]interface{}) ([]byte, error) {
 		args[i+1] = v
 		i = i + 2
 	}
-	v, e := c.Call("HMSET", args...)
+	v, e := c.CallN(RetryTimes, "HMSET", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -854,7 +859,7 @@ func (c *Conn) HMSET(key string, kv map[string]interface{}) ([]byte, error) {
 }
 
 func (c *Conn) HSET(key, field string, value interface{}) (int64, error) {
-	n, e := c.Call("HSET", key, field, value)
+	n, e := c.CallN(RetryTimes, "HSET", key, field, value)
 	if e != nil {
 		return -1, e
 	}
@@ -862,7 +867,7 @@ func (c *Conn) HSET(key, field string, value interface{}) (int64, error) {
 }
 
 func (c *Conn) HSETNX(key, field string, value interface{}) (int64, error) {
-	n, e := c.Call("HSETNX", key, field, value)
+	n, e := c.CallN(RetryTimes, "HSETNX", key, field, value)
 	if e != nil {
 		return -1, e
 	}
@@ -870,7 +875,7 @@ func (c *Conn) HSETNX(key, field string, value interface{}) (int64, error) {
 }
 
 func (c *Conn) HVALS(key string) ([]interface{}, error) {
-	v, e := c.Call("HVALS", key)
+	v, e := c.CallN(RetryTimes, "HVALS", key)
 	if e != nil {
 		return nil, e
 	}
@@ -886,7 +891,7 @@ func (c *Conn) HSCAN(key string, cursor int, match bool, pattern string, isCount
 	if isCount {
 		args = append(args, "COUNT", count)
 	}
-	v, e := c.Call("HSCAN", args...)
+	v, e := c.CallN(RetryTimes, "HSCAN", args...)
 	if e != nil {
 		return 0, nil, e
 	}
@@ -905,7 +910,7 @@ func (c *Conn) BLPOP(keys []string, timeout int) ([]interface{}, error) {
 	}
 	args[len(keys)] = timeout
 
-	v, e := c.Call("BLPOP", args...)
+	v, e := c.CallN(RetryTimes, "BLPOP", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -922,7 +927,7 @@ func (c *Conn) BRPOP(keys []string, timeout int) ([]interface{}, error) {
 	}
 	args[len(keys)] = timeout
 
-	v, e := c.Call("BRPOP", args...)
+	v, e := c.CallN(RetryTimes, "BRPOP", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -933,7 +938,7 @@ func (c *Conn) BRPOP(keys []string, timeout int) ([]interface{}, error) {
 }
 
 func (c *Conn) BRPOPLPUSH(source, dest string, timeout int) ([]byte, error) {
-	v, e := c.Call("BRPOPLPUSH", source, dest, timeout)
+	v, e := c.CallN(RetryTimes, "BRPOPLPUSH", source, dest, timeout)
 	if e != nil {
 		return nil, e
 	}
@@ -944,7 +949,7 @@ func (c *Conn) BRPOPLPUSH(source, dest string, timeout int) ([]byte, error) {
 }
 
 func (c *Conn) LINDEX(key string, index int) ([]byte, error) {
-	v, e := c.Call("LINDEX", key, index)
+	v, e := c.CallN(RetryTimes, "LINDEX", key, index)
 	if e != nil {
 		return nil, e
 	}
@@ -958,7 +963,7 @@ func (c *Conn) LINSERT(key, dir, pivot, value string) (int64, error) {
 	if strings.ToLower(dir) != "before" && strings.ToLower(dir) != "after" {
 		return -1, errors.New(CommonErrPrefix + "dir only can be (before or after)")
 	}
-	n, e := c.Call("LINSERT", key, dir, pivot, value)
+	n, e := c.CallN(RetryTimes, "LINSERT", key, dir, pivot, value)
 	if e != nil {
 		return -1, e
 	}
@@ -966,7 +971,7 @@ func (c *Conn) LINSERT(key, dir, pivot, value string) (int64, error) {
 }
 
 func (c *Conn) LLEN(key string) (int64, error) {
-	n, e := c.Call("LLEN", key)
+	n, e := c.CallN(RetryTimes, "LLEN", key)
 	if e != nil {
 		return -1, e
 	}
@@ -974,7 +979,7 @@ func (c *Conn) LLEN(key string) (int64, error) {
 }
 
 func (c *Conn) LPOP(key string) ([]byte, error) {
-	v, e := c.Call("LPOP", key)
+	v, e := c.CallN(RetryTimes, "LPOP", key)
 	if e != nil {
 		return nil, e
 	}
@@ -990,7 +995,7 @@ func (c *Conn) LPUSH(key string, values []string) (int64, error) {
 	for i, v := range values {
 		args[i+1] = v
 	}
-	n, e := c.Call("LPUSH", args...)
+	n, e := c.CallN(RetryTimes, "LPUSH", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -998,7 +1003,7 @@ func (c *Conn) LPUSH(key string, values []string) (int64, error) {
 }
 
 func (c *Conn) LPUSHX(key, value string) (int64, error) {
-	n, e := c.Call("LPUSHX", key, value)
+	n, e := c.CallN(RetryTimes, "LPUSHX", key, value)
 	if e != nil {
 		return -1, e
 	}
@@ -1006,7 +1011,7 @@ func (c *Conn) LPUSHX(key, value string) (int64, error) {
 }
 
 func (c *Conn) LRANGE(key string, start, end int) ([]interface{}, error) {
-	v, e := c.Call("LRANGE", key, start, end)
+	v, e := c.CallN(RetryTimes, "LRANGE", key, start, end)
 	if e != nil {
 		return nil, e
 	}
@@ -1014,7 +1019,7 @@ func (c *Conn) LRANGE(key string, start, end int) ([]interface{}, error) {
 }
 
 func (c *Conn) LREM(key string, count int, value string) (int64, error) {
-	n, e := c.Call("LREM", key, count, value)
+	n, e := c.CallN(RetryTimes, "LREM", key, count, value)
 	if e != nil {
 		return -1, e
 	}
@@ -1022,7 +1027,7 @@ func (c *Conn) LREM(key string, count int, value string) (int64, error) {
 }
 
 func (c *Conn) LSET(key string, index int, value string) ([]byte, error) {
-	v, e := c.Call("LSET", key, index, value)
+	v, e := c.CallN(RetryTimes, "LSET", key, index, value)
 	if e != nil {
 		return nil, e
 	}
@@ -1030,7 +1035,7 @@ func (c *Conn) LSET(key string, index int, value string) ([]byte, error) {
 }
 
 func (c *Conn) LTRIM(key string, start, end int) ([]byte, error) {
-	v, e := c.Call("LTRIM", key, start, end)
+	v, e := c.CallN(RetryTimes, "LTRIM", key, start, end)
 	if e != nil {
 		return nil, e
 	}
@@ -1038,7 +1043,7 @@ func (c *Conn) LTRIM(key string, start, end int) ([]byte, error) {
 }
 
 func (c *Conn) RPOP(key string) ([]byte, error) {
-	v, e := c.Call("RPOP", key)
+	v, e := c.CallN(RetryTimes, "RPOP", key)
 	if e != nil {
 		return nil, e
 	}
@@ -1049,7 +1054,7 @@ func (c *Conn) RPOP(key string) ([]byte, error) {
 }
 
 func (c *Conn) RPOPLPUSH(source, dest string) ([]byte, error) {
-	v, e := c.Call("RPOPLPUSH", source, dest)
+	v, e := c.CallN(RetryTimes, "RPOPLPUSH", source, dest)
 	if e != nil {
 		return nil, e
 	}
@@ -1065,7 +1070,7 @@ func (c *Conn) RPUSH(key string, values []string) (int64, error) {
 	for i, v := range values {
 		args[i+1] = v
 	}
-	n, e := c.Call("RPUSH", args...)
+	n, e := c.CallN(RetryTimes, "RPUSH", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -1073,7 +1078,7 @@ func (c *Conn) RPUSH(key string, values []string) (int64, error) {
 }
 
 func (c *Conn) RPUSHX(key, value string) (int64, error) {
-	n, e := c.Call("RPUSHX", key, value)
+	n, e := c.CallN(RetryTimes, "RPUSHX", key, value)
 	if e != nil {
 		return -1, e
 	}
@@ -1090,7 +1095,7 @@ func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) 
 		args[i+1] = k
 		i = i + 2
 	}
-	n, e := c.Call("ZADD", args...)
+	n, e := c.CallN(RetryTimes, "ZADD", args...)
 	if e != nil {
 		return -1, nil
 	}
@@ -1098,7 +1103,7 @@ func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) 
 }
 
 func (c *Conn) ZCARD(key string) (int64, error) {
-	n, e := c.Call("ZCARD", key)
+	n, e := c.CallN(RetryTimes, "ZCARD", key)
 	if e != nil {
 		return -1, nil
 	}
@@ -1106,7 +1111,7 @@ func (c *Conn) ZCARD(key string) (int64, error) {
 }
 
 func (c *Conn) ZCOUNT(key string, min, max float64) (int64, error) {
-	n, e := c.Call("ZCOUNT", key, min, max)
+	n, e := c.CallN(RetryTimes, "ZCOUNT", key, min, max)
 	if e != nil {
 		return -1, nil
 	}
@@ -1115,7 +1120,7 @@ func (c *Conn) ZCOUNT(key string, min, max float64) (int64, error) {
 
 // increment could be int, float ,string
 func (c *Conn) ZINCRBY(key string, increment interface{}, member string) ([]byte, error) {
-	v, e := c.Call("ZINCRBY", key, increment, member)
+	v, e := c.CallN(RetryTimes, "ZINCRBY", key, increment, member)
 	if e != nil {
 		return nil, e
 	}
@@ -1145,7 +1150,7 @@ func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weigh
 	if aggregate == true {
 		args = append(args, "AGGREGATE", ag)
 	}
-	n, e := c.Call("ZINTERSTORE", args...)
+	n, e := c.CallN(RetryTimes, "ZINTERSTORE", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -1154,7 +1159,7 @@ func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weigh
 
 // since 2.8.9
 // func (c *Conn) ZLEXCOUNT(key, min, max string) (int64, error) {
-// 	n, e := c.Call("ZLEXCOUNT", key, min, max)
+// 	n, e := c.CallN(RetryTimes,"ZLEXCOUNT", key, min, max)
 // 	if e != nil {
 // 		return -1, e
 // 	}
@@ -1163,13 +1168,13 @@ func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weigh
 
 func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
 	if withscores == true {
-		v, e := c.Call("ZRANGE", key, start, stop, "WITHSCORES")
+		v, e := c.CallN(RetryTimes, "ZRANGE", key, start, stop, "WITHSCORES")
 		if e != nil {
 			return nil, e
 		}
 		return v.([]interface{}), nil
 	}
-	v, e := c.Call("ZRANGE", key, start, stop)
+	v, e := c.CallN(RetryTimes, "ZRANGE", key, start, stop)
 	if e != nil {
 		return nil, e
 	}
@@ -1185,7 +1190,7 @@ func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface
 // 	if limit {
 // 		args = append(args, "LIMIT", offset, count)
 // 	}
-// 	v, e := c.Call("ZRANGEBYLEX", args...)
+// 	v, e := c.CallN(RetryTimes,"ZRANGEBYLEX", args...)
 // 	if e != nil {
 // 		return nil, e
 // 	}
@@ -1201,7 +1206,7 @@ func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface
 // 	if limit {
 // 		args = append(args, "LIMIT", offset, count)
 // 	}
-// 	v, e := c.Call("ZREVRANGEBYLEX", args...)
+// 	v, e := c.CallN(RetryTimes,"ZREVRANGEBYLEX", args...)
 // 	if e != nil {
 // 		return nil, e
 // 	}
@@ -1219,7 +1224,7 @@ func (c *Conn) ZRANGEBYSCORE(key string, min, max interface{}, withScores, limit
 	if limit {
 		args = append(args, "LIMIT", offset, count)
 	}
-	v, e := c.Call("ZRANGEBYSCORE", args...)
+	v, e := c.CallN(RetryTimes, "ZRANGEBYSCORE", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -1228,7 +1233,7 @@ func (c *Conn) ZRANGEBYSCORE(key string, min, max interface{}, withScores, limit
 
 // if key,or member not exists return bulk string nil, else return integer
 func (c *Conn) ZRANK(key, member string) (int64, error) {
-	n, e := c.Call("ZRANK", key, member)
+	n, e := c.CallN(RetryTimes, "ZRANK", key, member)
 	if e != nil {
 		return -1, e
 	}
@@ -1247,7 +1252,7 @@ func (c *Conn) ZREM(key string, members []string) (int64, error) {
 		args[i] = m
 		i++
 	}
-	n, e := c.Call("ZREM", args...)
+	n, e := c.CallN(RetryTimes, "ZREM", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -1256,7 +1261,7 @@ func (c *Conn) ZREM(key string, members []string) (int64, error) {
 
 // since 2.8.9
 // func (c *Conn) ZREMRANGEBYLEX(key, min, max string) (int64, error) {
-// 	n, e := c.Call("ZREMRANGEBYLEX", key, min, max)
+// 	n, e := c.CallN(RetryTimes,"ZREMRANGEBYLEX", key, min, max)
 // 	if e != nil {
 // 		return -1, e
 // 	}
@@ -1264,7 +1269,7 @@ func (c *Conn) ZREM(key string, members []string) (int64, error) {
 // }
 
 func (c *Conn) ZREMRANGEBYRANK(key string, min, max interface{}) (int64, error) {
-	n, e := c.Call("ZREMRANGEBYRANK", key, min, max)
+	n, e := c.CallN(RetryTimes, "ZREMRANGEBYRANK", key, min, max)
 	if e != nil {
 		return -1, e
 	}
@@ -1272,7 +1277,7 @@ func (c *Conn) ZREMRANGEBYRANK(key string, min, max interface{}) (int64, error) 
 }
 
 func (c *Conn) ZREMRANGEBYSCORE(key string, min, max interface{}) (int64, error) {
-	n, e := c.Call("ZREMRANGEBYSCORE", key, min, max)
+	n, e := c.CallN(RetryTimes, "ZREMRANGEBYSCORE", key, min, max)
 	if e != nil {
 		return -1, e
 	}
@@ -1281,13 +1286,13 @@ func (c *Conn) ZREMRANGEBYSCORE(key string, min, max interface{}) (int64, error)
 
 func (c *Conn) ZREVRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
 	if withscores == true {
-		v, e := c.Call("ZREVRANGE", key, start, stop, "WITHSCORES")
+		v, e := c.CallN(RetryTimes, "ZREVRANGE", key, start, stop, "WITHSCORES")
 		if e != nil {
 			return nil, e
 		}
 		return v.([]interface{}), nil
 	}
-	v, e := c.Call("ZREVRANGE", key, start, stop)
+	v, e := c.CallN(RetryTimes, "ZREVRANGE", key, start, stop)
 	if e != nil {
 		return nil, e
 	}
@@ -1305,7 +1310,7 @@ func (c *Conn) ZREVRANGEBYSCORE(key string, max, min interface{}, withScores, li
 	if limit {
 		args = append(args, "LIMIT", offset, count)
 	}
-	v, e := c.Call("ZREVRANGEBYSCORE", args...)
+	v, e := c.CallN(RetryTimes, "ZREVRANGEBYSCORE", args...)
 	if e != nil {
 		return nil, e
 	}
@@ -1313,7 +1318,7 @@ func (c *Conn) ZREVRANGEBYSCORE(key string, max, min interface{}, withScores, li
 }
 
 func (c *Conn) ZREVRANK(key, member string) (int64, error) {
-	n, e := c.Call("ZREVRANK", key, member)
+	n, e := c.CallN(RetryTimes, "ZREVRANK", key, member)
 	if e != nil {
 		return -1, e
 	}
@@ -1325,7 +1330,7 @@ func (c *Conn) ZREVRANK(key, member string) (int64, error) {
 }
 
 func (c *Conn) ZSCORE(key, member string) ([]byte, error) {
-	v, e := c.Call("ZSCORE", key, member)
+	v, e := c.CallN(RetryTimes, "ZSCORE", key, member)
 	if e != nil {
 		return nil, e
 	}
@@ -1358,7 +1363,7 @@ func (c *Conn) ZUNIONSTORE(destination string, numkeys int, keys []string, weigh
 	if aggregate == true {
 		args = append(args, "AGGREGATE", ag)
 	}
-	n, e := c.Call("ZUNIONSTORE", args...)
+	n, e := c.CallN(RetryTimes, "ZUNIONSTORE", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -1374,7 +1379,7 @@ func (c *Conn) ZSCAN(key string, cursor int, match bool, pattern string, isCount
 	if isCount {
 		args = append(args, "COUNT", count)
 	}
-	v, e := c.Call("ZSCAN", args...)
+	v, e := c.CallN(RetryTimes, "ZSCAN", args...)
 	if e != nil {
 		return 0, nil, e
 	}
@@ -1395,7 +1400,7 @@ func (c *Conn) PFADD(key string, elements []string) (int64, error) {
 		args[i] = element
 		i++
 	}
-	n, e := c.Call("PFADD", args...)
+	n, e := c.CallN(RetryTimes, "PFADD", args...)
 	if e != nil {
 		return -1, e
 	}
@@ -1409,14 +1414,14 @@ func (c *Conn) PFCOUNT(keys []string) (int64, error) {
 		args[i] = key
 		i++
 	}
-	n, e := c.Call("PFCOUNT", args...)
+	n, e := c.CallN(RetryTimes, "PFCOUNT", args...)
 	if e != nil {
 		return -1, e
 	}
 	return n.(int64), nil
 }
 
-func (c *Conn) PFMERGE(destKey string, sourceKeys []string) (int64, error) {
+func (c *Conn) PFMERGE(destKey string, sourceKeys []string) ([]byte, error) {
 	args := make([]interface{}, 1+len(sourceKeys))
 	args[0] = destKey
 	i := 1
@@ -1424,9 +1429,91 @@ func (c *Conn) PFMERGE(destKey string, sourceKeys []string) (int64, error) {
 		args[i] = sourceKey
 		i++
 	}
-	n, e := c.Call("PFMERGE", args...)
+	n, e := c.CallN(RetryTimes, "PFMERGE", args...)
 	if e != nil {
-		return -1, e
+		return nil, e
 	}
 	return n.([]byte), nil
+}
+
+/******************* scripting *******************/
+func (c *Conn) EVAL(script string, numkeys int, keys []string, scriptArgs []string) (interface{}, error) {
+	args := make([]interface{}, 2+numkeys+len(scriptArgs))
+	args[0] = script
+	args[1] = numkeys
+	i := 2
+	for _, key := range keys {
+		args[i] = key
+		i++
+	}
+	for _, scriptArg := range scriptArgs {
+		args[i] = scriptArg
+		i++
+	}
+
+	v, e := c.CallN(RetryTimes, "EVAL", args...)
+	if e != nil {
+		return nil, e
+	}
+	return v, nil
+}
+
+func (c *Conn) EVALSHA(sha1 string, numkeys int, keys []string, scriptArgs []string) (interface{}, error) {
+	args := make([]interface{}, 2+numkeys+len(scriptArgs))
+	args[0] = sha1
+	args[1] = numkeys
+	i := 2
+	for _, key := range keys {
+		args[i] = key
+		i++
+	}
+	for _, scriptArg := range scriptArgs {
+		args[i] = scriptArg
+		i++
+	}
+
+	v, e := c.CallN(RetryTimes, "EVALSHA", args...)
+	if e != nil {
+		return nil, e
+	}
+	return v, nil
+}
+
+func (c *Conn) SCRIPTEXISTS(scripts []string) ([]interface{}, error) {
+	args := make([]interface{}, 1+len(scripts))
+	args[0] = "EXISTS"
+	i := 1
+	for _, script := range scripts {
+		args[i] = script
+		i++
+	}
+	v, e := c.CallN(RetryTimes, "SCRIPT", args...)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]interface{}), nil
+}
+
+func (c *Conn) SCRIPTFLUSH() ([]byte, error) {
+	v, e := c.CallN(RetryTimes, "SCRIPT", "FLUSH")
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) SCRIPTKILL() ([]byte, error) {
+	v, e := c.CallN(RetryTimes, "SCRIPT", "KILL")
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
+}
+
+func (c *Conn) SCRIPTLOAD(script string) ([]byte, error) {
+	v, e := c.CallN(RetryTimes, "SCRIPT", "LOAD", script)
+	if e != nil {
+		return nil, e
+	}
+	return v.([]byte), nil
 }
