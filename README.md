@@ -58,10 +58,10 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 
 ####	Use Lua script?
 ###### Lua 脚本是针对pool结构的，每个pool有一个script map，使用者可以预先编写好需要用到的脚本，通过script load函数生成sha1
-然后，放入map中，下次方便调用，且不用每次都编译，而且可能节省带宽，变相的增加了访问的速度
+###### 然后，放入map中，下次方便调用，且不用每次都编译，而且可能节省带宽，变相的增加了访问的速度
 
 ###### 需要注意的一点是，如果返回lua的table，所以只能是整数，且从1开始顺序的。
-###### 具体关于redis lua的说明请参考 <p><a href="http://redis.io/commands/eval"> 这里</a></p>
+###### 具体关于redis lua的说明请参考<a href="http://redis.io/commands/eval">http://redis.io/commands/eval</a>
 >		p := NewPool("10.16.15.121:9731", "", 10, 10)
 >		c := p.Pop()
 >		if c == nil {
