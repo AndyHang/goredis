@@ -11,7 +11,7 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >			return
 >		}
 >
->	If redis do not need AUTH, password =""
+>	如果redis不需要AUTH认证, password =""
 
 ####	A Redis Command.
 >		c.GET("mykey")
@@ -51,11 +51,9 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >		key := "myhashes"
 >		c = mp.PopByKey(key)
 >		mp.PushByKey(key, c)
->	PopByKey and PushByKey based on a Hash Algorithm. You can change your hash Algorithm.
->	The Hash code is implemented in Sum function.
->	AddPool is for a new pool in multiPool that have different maxConnNum and maxIdleSeconds configuration.
->	Note: AddPool must call before use the multiPool, because the map inside multiPool have no mutex.
-
+>	PopByKey和PushByKey是对参数key进行hash，然后选出固定的redis。你可以使用自己的hash算法，具体实现在Sum函数中。
+>	AddPool函数，会在multiPool中新加入一个Pool，maxConnNum和maxIdleSeconds可以和初始化multiPool的时候不同，
+>	注意：必须在init的时候按顺序添加不同参数的Pool，因为multiPool里面没有对pool slice加锁
 
 ####	Use Lua script?
 ###### Lua 脚本是针对pool结构的，每个pool有一个script map，使用者可以预先编写好需要用到的脚本，通过script load函数生成sha1
