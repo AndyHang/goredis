@@ -43,6 +43,7 @@ var (
 
 //
 type Conn struct {
+	Address        string
 	keepAlive      bool
 	pipeCount      int
 	lastActiveTime int64
@@ -53,9 +54,10 @@ type Conn struct {
 	readTimeout    time.Duration
 	writeTimeout   time.Duration
 	pool           *Pool
+	err            error // 表示该条链接是否已经出错
 }
 
-func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool) *Conn {
+func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool, Address string) *Conn {
 	return &Conn{
 		conn:           conn,
 		lastActiveTime: time.Now().Unix(),
@@ -66,6 +68,7 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		readTimeout:    readTimeout,
 		writeTimeout:   writeTimeout,
 		pool:           pool,
+		Address:        Address,
 	}
 }
 
@@ -79,7 +82,10 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 		return nil, ErrBadTcpConn
 	}
 
-	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive, pool)
+	if password != "" {
+		address = address + "@" + password
+	}
+	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive, pool, address)
 	if password != "" {
 		if _, e := conn.AUTH(password); e != nil {
 			return nil, e
@@ -88,29 +94,38 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 	return conn, nil
 }
 
+func (c *Conn) Copy(conn *Conn) {
+	c.Address = conn.Address
+	c.keepAlive = conn.keepAlive
+	c.pipeCount = conn.pipeCount
+	c.lastActiveTime = conn.lastActiveTime
+	c.buffer = conn.buffer
+	c.conn = conn.conn
+	c.rb = conn.rb
+	c.wb = conn.wb
+	c.readTimeout = conn.readTimeout
+	c.writeTimeout = conn.writeTimeout
+	c.pool = conn.pool
+}
+
 func (c *Conn) Close() {
 	if c.conn != nil {
 		c.conn.Close()
 	}
 }
 
-// 连接无效了，无法从这里取一条新的连接，除非c里面有一个pool的指针
 func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{}, error) {
 	var ret interface{}
 	var e error
 	for i := 0; i < retry; i++ {
 		ret, e = c.Call(command, args...)
-		if e != nil && !strings.Contains(e.Error(), CommonErrPrefix) {
-			time.Sleep(RetryWaitSeconds)
-			// get a new conn from pool
-			c.Close()
-			if c.pool == nil {
+		if c.err != nil {
+			c.pool.Push(c)
+			conn := c.pool.Pop()
+			if conn == nil {
 				return nil, e
 			}
-			c = c.pool.Pop()
-			if c == nil {
-				return nil, e
-			}
+			c.Copy(conn)
 			continue
 		}
 		break
@@ -128,6 +143,14 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 		c.pool.callMu.Unlock()
 	}
 	var e error
+	// 如果链接网络出错，标记该条链接已出错，并立刻关闭该条链接
+	defer func() {
+		if e != nil && !strings.Contains(e.Error(), CommonErrPrefix) {
+			c.err = e
+			c.Close()
+		}
+	}()
+
 	if c.writeTimeout > 0 {
 		if e = c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); e != nil {
 			return nil, e

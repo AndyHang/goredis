@@ -487,3 +487,57 @@ func TestSCAN(t *testing.T) {
 		fmt.Printf("CURSOR=%d, elements=%v\n", cursor, eles)
 	}
 }
+
+func BenchmarkStrings(b *testing.B) {
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false, nil)
+	if e != nil {
+		println(e.Error())
+		return
+	}
+	defer c.conn.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.SET("key", "valuevaluevaluevaluevalue")
+	}
+}
+
+func BenchmarkSets(b *testing.B) {
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false, nil)
+	if e != nil {
+		println(e.Error())
+		return
+	}
+	defer c.conn.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.SADD("keySets", []string{"valuevaluevaluevaluevalue"})
+	}
+}
+
+func BenchmarkHashes(b *testing.B) {
+	c, e := Dial("10.16.15.121:9731", "", ConnectTimeout, ReadTimeout, WriteTimeout, false, nil)
+	if e != nil {
+		println(e.Error())
+		return
+	}
+	defer c.conn.Close()
+
+	kv := make(map[string]interface{})
+	kv["f1"] = "f1"
+	kv["f2"] = "f2"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.HMSET("keyHashes", kv)
+	}
+}
+
+//
+//
+//
+//
+//
+//
+
+//
+//

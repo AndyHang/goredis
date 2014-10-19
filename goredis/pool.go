@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const ()
+const (
+	DefaultMaxConnNumber  = 50
+	DefaultMaxIdleSeconds = 28
+)
 
 // include multi redis server's connection pool
 type MultiPool struct {
@@ -95,6 +98,25 @@ func (mp *MultiPool) PushByKey(key string, c *Conn) {
 	mp.pools[addr].Push(c)
 }
 
+func (mp *MultiPool) Push(c *Conn) {
+	if c == nil {
+		return
+	}
+	addr := c.Address
+	if _, ok := mp.pools[addr]; !ok {
+		fmt.Println("[Push] invalid address:" + addr)
+		c.Close()
+		return
+	}
+	mp.pools[addr].Push(c)
+}
+
+func (mp *MultiPool) Info() {
+	for _, p := range mp.pools {
+		fmt.Println(p.PoolInfo())
+	}
+}
+
 const (
 	// MaxIdleNum     = 20
 	// MaxActiveNum   = 20
@@ -143,7 +165,6 @@ PopLoop:
 	for {
 		select {
 		case c = <-p.ClientPool:
-			// fmt.Println("[Pop] in case")
 			if time.Now().Unix()-c.lastActiveTime > p.MaxIdleSeconds {
 				if c.IsAlive() {
 					p.mu.Lock()
@@ -156,28 +177,19 @@ PopLoop:
 				p.mu.Lock()
 				p.IdleNum--
 				p.mu.Unlock()
-				fmt.Println("[Pop] lastActiveTime exceed 30s")
+				fmt.Println("[Pop] lastActiveTime exceed maxIdleSeconds")
 				break
 			}
-			// if !c.IsAlive() {
-			// 	p.mu.Lock()
-			// 	p.IdleNum--
-			// 	p.mu.Unlock()
-			// 	c.Close()
-			// 	fmt.Println("[Pop] not alive")
-			// 	break
-			// }
 			p.mu.Lock()
 			p.IdleNum--
 			p.ActiveNum++
 			p.mu.Unlock()
 			break PopLoop
 		default:
-			// fmt.Println("[Pop] in default")
 			p.mu.RLock()
 			if p.IdleNum+p.ActiveNum >= p.MaxConnNum {
 				p.mu.RUnlock()
-				// fmt.Println("waiting................")
+				fmt.Println("waiting................")
 				if waitSeconds <= 0 {
 					break PopLoop
 				}
@@ -188,6 +200,7 @@ PopLoop:
 			}
 			p.mu.RUnlock()
 
+			//
 			p.mu.Lock()
 			p.ActiveNum++
 			p.mu.Unlock()
@@ -208,19 +221,24 @@ PopLoop:
 
 func (p *Pool) Push(c *Conn) {
 	if c == nil {
+		// p.mu.Lock()
+		// p.ActiveNum--
+		// p.mu.Unlock()
 		fmt.Println("[Push] c == nil")
 		return
 	}
-	// if !c.IsAlive() {
-	// 	p.mu.Lock()
-	// 	p.ActiveNum--
-	// 	p.mu.Unlock()
-	// 	c.Close()
-	// 	fmt.Println("[Push] not alive")
-	// 	return
-	// }
+
+	if c.err != nil {
+		c.Close()
+		p.mu.Lock()
+		p.ActiveNum--
+		p.mu.Unlock()
+		return
+	}
+
 	select {
 	case p.ClientPool <- c:
+		// fmt.Println("Push in Channel")
 		p.mu.Lock()
 		p.IdleNum++
 		p.ActiveNum--
@@ -228,7 +246,10 @@ func (p *Pool) Push(c *Conn) {
 		// fmt.Println("[Push] success")
 	default:
 		c.Close()
-		fmt.Println("[Push] discard")
+		p.mu.Lock()
+		p.ActiveNum--
+		p.mu.Unlock()
+		// fmt.Println("[Push] discard")
 		// discard
 	}
 }
@@ -254,9 +275,10 @@ func (p *Pool) PoolInfo() string {
 	var IdleN, ActiveN int
 	p.mu.RLock()
 	IdleN = p.IdleNum
-	ActiveN = p.IdleNum
+	ActiveN = p.ActiveNum
 	p.mu.RUnlock()
-	return "ActiveNum=" + strconv.Itoa(ActiveN) + "\n IdleNum=" + strconv.Itoa(IdleN) + " \n"
+	return "Address=" + p.Address + "    ActiveNum=" + strconv.Itoa(ActiveN) +
+		"    IdleNum=" + strconv.Itoa(IdleN) + "    ChannelLen=" + strconv.Itoa(len(p.ClientPool))
 }
 
 func (p *Pool) QPS() int64 {

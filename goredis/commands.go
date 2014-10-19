@@ -10,7 +10,7 @@ import (
 
 /******************* connections *******************/
 func (c *Conn) AUTH(password string) (bool, error) {
-	v, e := c.CallN(RetryTimes, "AUTH", password)
+	v, e := c.Call("AUTH", password)
 	if e != nil {
 		fmt.Println("AUTH failed:" + e.Error())
 		return false, e
@@ -32,7 +32,8 @@ func (c *Conn) QUIT() {
 }
 
 func (c *Conn) IsAlive() bool {
-	v, e := c.CallN(RetryTimes, "PING")
+	// v, e := c.CallN(RetryTimes, "PING")
+	v, e := c.Call("PING")
 	if e != nil {
 		return false
 	}
@@ -47,7 +48,7 @@ func (c *Conn) IsAlive() bool {
 }
 
 func (c *Conn) Info() ([]byte, error) {
-	v, e := c.CallN(RetryTimes, "INFO")
+	v, e := c.Call("INFO")
 	if e != nil {
 		return nil, e
 	}
