@@ -44,7 +44,6 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 ####	Create a new multiPool?
 >		addresses := []string{"127.0.0.1:6379", "127.0.0.1:9991@1"}
 >		mp := NewMultiPool(addresses, maxConnNum, maxIdleSeconds)
->		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
 >		addr := "127.0.0.1:6379"
 >		c := mp.PopByAddr(addr)
 >		mp.PushByAddr(addr, c)
@@ -54,6 +53,18 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >	PopByKey和PushByKey是对参数key进行hash，然后选出固定的redis。你可以使用自己的hash算法，具体实现在Sum函数中。
 >	AddPool函数，会在multiPool中新加入一个Pool，maxConnNum和maxIdleSeconds可以和初始化multiPool的时候不同，
 >	注意：必须在init的时候按顺序添加不同参数的Pool，因为multiPool里面没有对pool slice加锁
+
+####	Add a new pool into multiPool?
+>		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
+>	当有新的pool需要加入到pool中时，可以用该方法，但是如果你是通过对key进行hash，然后选择redis pool的话，会影响数据的一致性
+
+####	Delete a pool from multiPool?
+>		mp.DelPool("127.0.0.1:9988")
+>	删除一个pool，可以用该方法，但是如果你是通过对key进行hash，然后选择redis pool的话，会影响数据的一致性
+
+####	Replace a exists pool in multiPool?
+>		mp.ReplacePool("127.0.0.1:9901", "127.0.0.1:9801", 20, 8)
+>	如果需要替换一个redis pool可以用该方法
 
 ####	Use Lua script?
 ###### Lua 脚本是针对pool结构的，每个pool有一个script map，使用者可以预先编写好需要用到的脚本，通过script load函数生成sha1
