@@ -17,6 +17,7 @@ const (
 type MultiPool struct {
 	pools   map[string]*Pool
 	servers []string
+	mu      sync.RWMutex
 }
 
 //
@@ -45,57 +46,122 @@ func (mp *MultiPool) AddPool(address string, maxConnNum int, maxIdleSeconds int6
 	addrPass := strings.Split(address, "@")
 	if len(addrPass) == 2 {
 		// redis need auth
+		mp.mu.Lock()
 		mp.pools[address] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
+		mp.mu.Unlock()
 	} else if len(addrPass) == 1 {
 		// redis do not need auth
+		mp.mu.Lock()
 		mp.pools[address] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
+		mp.mu.Unlock()
 	} else {
 		fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
 		return false
 	}
+	mp.mu.Lock()
 	mp.servers = append(mp.servers, address)
+	mp.mu.Unlock()
 	return true
 }
 
-// 暂不支持
-func (mp *MultiPool) DelPool() bool {
-	return false
+func (mp *MultiPool) DelPool(address string) {
+	mp.mu.Lock()
+	delete(mp.pools, address)
+	delIndex := -1
+	for index, addr := range mp.servers {
+		if addr == address {
+			delIndex = index
+			break
+		}
+	}
+	if delIndex != -1 {
+		mp.servers = append(mp.servers[:delIndex], mp.servers[delIndex+1:]...)
+	}
+	mp.mu.Unlock()
+}
+
+func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds int64) bool {
+	mp.mu.RLock()
+	_, ok := mp.pools[src]
+	delete(mp.pools, src)
+	mp.mu.RUnlock()
+	if !ok {
+		fmt.Println("src=" + src + " not exists in the pool")
+		return false
+	}
+
+	addrPass := strings.Split(dst, "@")
+	if len(addrPass) == 2 {
+		// redis need auth
+		mp.mu.Lock()
+		mp.pools[dst] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
+		mp.mu.Unlock()
+	} else if len(addrPass) == 1 {
+		// redis do not need auth
+		mp.mu.Lock()
+		mp.pools[dst] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
+		mp.mu.Unlock()
+	} else {
+		fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+		return false
+	}
+	mp.mu.Lock()
+	for _, server := range mp.servers {
+		if server == src {
+			server = dst
+		}
+	}
+	mp.mu.Unlock()
+	return true
 }
 
 // get conn by address directly
 func (mp *MultiPool) PopByAddr(addr string) *Conn {
-	if _, ok := mp.pools[addr]; !ok {
+	mp.mu.RLock()
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
 		fmt.Println("[PopByAddr] invalid address:" + addr)
 		return nil
 	}
-	return mp.pools[addr].Pop()
+	return pool.Pop()
 }
 
 func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
-	if _, ok := mp.pools[addr]; !ok {
+	mp.mu.RLock()
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
 		fmt.Println("[PushByAddr] invalid address:" + addr)
 		return
 	}
-	mp.pools[addr].Push(c)
+	pool.Push(c)
 }
 
 // sum(key)/len(pools)
 func (mp *MultiPool) PopByKey(key string) *Conn {
+	mp.mu.RLock()
 	addr := mp.servers[Sum(key)/len(mp.pools)]
-	if _, ok := mp.pools[addr]; !ok {
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+
+	if !ok {
 		fmt.Println("[PopByKey] invalid address:" + addr)
 		return nil
 	}
-	return mp.pools[addr].Pop()
+	return pool.Pop()
 }
 
 func (mp *MultiPool) PushByKey(key string, c *Conn) {
+	mp.mu.RLock()
 	addr := mp.servers[Sum(key)/len(mp.pools)]
-	if _, ok := mp.pools[addr]; !ok {
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
 		fmt.Println("[PushByKey] invalid address:" + addr)
 		return
 	}
-	mp.pools[addr].Push(c)
+	pool.Push(c)
 }
 
 func (mp *MultiPool) Push(c *Conn) {
@@ -103,26 +169,25 @@ func (mp *MultiPool) Push(c *Conn) {
 		return
 	}
 	addr := c.Address
-	if _, ok := mp.pools[addr]; !ok {
+	mp.mu.RLock()
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
 		fmt.Println("[Push] invalid address:" + addr)
-		c.Close()
 		return
 	}
-	mp.pools[addr].Push(c)
+	pool.Push(c)
 }
 
-func (mp *MultiPool) Info() {
+func (mp *MultiPool) Info() string {
+	var info string
+	mp.mu.RLock()
 	for _, p := range mp.pools {
-		fmt.Println(p.PoolInfo())
+		info = info + p.PoolInfo() + "\n"
 	}
+	mp.mu.RUnlock()
+	return info
 }
-
-const (
-	// MaxIdleNum     = 20
-	// MaxActiveNum   = 20
-	GMaxConnNum     = 50
-	GMaxIdleSeconds = 28
-)
 
 // connection pool of only one redis server
 type Pool struct {
