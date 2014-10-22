@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -43,8 +44,10 @@ var (
 
 //
 type Conn struct {
+	sync.RWMutex
 	Address        string
 	keepAlive      bool
+	isIdle         bool
 	pipeCount      int
 	lastActiveTime int64
 	buffer         []byte
@@ -62,6 +65,7 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		conn:           conn,
 		lastActiveTime: time.Now().Unix(),
 		keepAlive:      keepAlive,
+		isIdle:         true,
 		buffer:         make([]byte, DefaultBufferSize),
 		rb:             bufio.NewReader(conn),
 		wb:             bufio.NewWriter(conn),
@@ -173,7 +177,6 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	if e != nil {
 		return nil, e
 	}
-	// fmt.Println(command+" costs:", time.Now().Sub(start).String())
 	return response, e
 }
 
@@ -306,7 +309,7 @@ func (c *Conn) readResponse() (interface{}, error) {
 func (c *Conn) readLine() (b []byte, e error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered in readLine", r)
+			println("Recovered in readLine", r)
 			e = errors.New("readLine painc")
 		}
 	}()

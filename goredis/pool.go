@@ -1,8 +1,7 @@
 package msgRedis
 
 import (
-	"fmt"
-	"strconv"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +31,7 @@ func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *Mul
 			// redis do not need auth
 			pools[addr] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
 		} else {
-			fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+			println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
 		}
 	}
 
@@ -55,7 +54,7 @@ func (mp *MultiPool) AddPool(address string, maxConnNum int, maxIdleSeconds int6
 		mp.pools[address] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
-		fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
 		return false
 	}
 	mp.mu.Lock()
@@ -86,7 +85,7 @@ func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds
 	delete(mp.pools, src)
 	mp.mu.RUnlock()
 	if !ok {
-		fmt.Println("src=" + src + " not exists in the pool")
+		println("src=" + src + " not exists in the pool")
 		return false
 	}
 
@@ -102,7 +101,7 @@ func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds
 		mp.pools[dst] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
-		fmt.Println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
 		return false
 	}
 	mp.mu.Lock()
@@ -121,7 +120,7 @@ func (mp *MultiPool) PopByAddr(addr string) *Conn {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		fmt.Println("[PopByAddr] invalid address:" + addr)
+		println("[PopByAddr] invalid address:" + addr)
 		return nil
 	}
 	return pool.Pop()
@@ -132,7 +131,7 @@ func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		fmt.Println("[PushByAddr] invalid address:" + addr)
+		println("[PushByAddr] invalid address:" + addr)
 		return
 	}
 	pool.Push(c)
@@ -141,12 +140,12 @@ func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
 // sum(key)/len(pools)
 func (mp *MultiPool) PopByKey(key string) *Conn {
 	mp.mu.RLock()
-	addr := mp.servers[Sum(key)/len(mp.pools)]
+	addr := mp.servers[Sum(key)%len(mp.pools)]
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 
 	if !ok {
-		fmt.Println("[PopByKey] invalid address:" + addr)
+		println("[PopByKey] invalid address:" + addr)
 		return nil
 	}
 	return pool.Pop()
@@ -154,11 +153,11 @@ func (mp *MultiPool) PopByKey(key string) *Conn {
 
 func (mp *MultiPool) PushByKey(key string, c *Conn) {
 	mp.mu.RLock()
-	addr := mp.servers[Sum(key)/len(mp.pools)]
+	addr := mp.servers[Sum(key)%len(mp.pools)]
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		fmt.Println("[PushByKey] invalid address:" + addr)
+		println("[PushByKey] invalid address:" + addr)
 		return
 	}
 	pool.Push(c)
@@ -173,7 +172,7 @@ func (mp *MultiPool) Push(c *Conn) {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		fmt.Println("[Push] invalid address:" + addr)
+		println("[Push] invalid address:" + addr)
 		return
 	}
 	pool.Push(c)
@@ -183,7 +182,7 @@ func (mp *MultiPool) Info() string {
 	var info string
 	mp.mu.RLock()
 	for _, p := range mp.pools {
-		info = info + p.PoolInfo() + "\n"
+		info = info + string(p.Info()) + "\n"
 	}
 	mp.mu.RUnlock()
 	return info
@@ -232,6 +231,11 @@ PopLoop:
 		case c = <-p.ClientPool:
 			if time.Now().Unix()-c.lastActiveTime > p.MaxIdleSeconds {
 				if c.IsAlive() {
+					// 标记当前连接为正在使用
+					c.Lock()
+					c.isIdle = false
+					c.Unlock()
+					// 更新连接计数
 					p.mu.Lock()
 					p.IdleNum--
 					p.ActiveNum++
@@ -242,9 +246,14 @@ PopLoop:
 				p.mu.Lock()
 				p.IdleNum--
 				p.mu.Unlock()
-				fmt.Println("[Pop] lastActiveTime exceed maxIdleSeconds")
+				println("[Pop] lastActiveTime exceed maxIdleSeconds")
 				break
 			}
+			// 标记当前连接为正在使用
+			c.Lock()
+			c.isIdle = false
+			c.Unlock()
+
 			p.mu.Lock()
 			p.IdleNum--
 			p.ActiveNum++
@@ -254,12 +263,12 @@ PopLoop:
 			p.mu.RLock()
 			if p.IdleNum+p.ActiveNum >= p.MaxConnNum {
 				p.mu.RUnlock()
-				fmt.Println("waiting................")
+				println("waiting................")
 				if waitSeconds <= 0 {
 					break PopLoop
 				}
 				waitSeconds--
-				fmt.Println("[Pop] max wait 1s")
+				println("[Pop] max wait 1s")
 				time.Sleep(1e9)
 				break
 			}
@@ -274,9 +283,13 @@ PopLoop:
 				p.mu.Lock()
 				p.ActiveNum--
 				p.mu.Unlock()
-				fmt.Println(e.Error())
+				println(e.Error())
 				break PopLoop
 			}
+			// 标记当前连接为正在使用
+			c.Lock()
+			c.isIdle = false
+			c.Unlock()
 
 			p.Push(c)
 		}
@@ -289,10 +302,20 @@ func (p *Pool) Push(c *Conn) {
 		// p.mu.Lock()
 		// p.ActiveNum--
 		// p.mu.Unlock()
-		fmt.Println("[Push] c == nil")
+		println("[Push] c == nil")
 		return
 	}
 
+	// 如果已经在连接池里，就不能再push进pool中
+	c.Lock()
+	if c.isIdle {
+		c.Unlock()
+		return
+	}
+	c.isIdle = true
+	c.Unlock()
+
+	// 如果连接网络出错，直接丢掉
 	if c.err != nil {
 		c.Close()
 		p.mu.Lock()
@@ -303,18 +326,15 @@ func (p *Pool) Push(c *Conn) {
 
 	select {
 	case p.ClientPool <- c:
-		// fmt.Println("Push in Channel")
 		p.mu.Lock()
 		p.IdleNum++
 		p.ActiveNum--
 		p.mu.Unlock()
-		// fmt.Println("[Push] success")
 	default:
 		c.Close()
 		p.mu.Lock()
 		p.ActiveNum--
 		p.mu.Unlock()
-		// fmt.Println("[Push] discard")
 		// discard
 	}
 }
@@ -335,15 +355,29 @@ func (p *Pool) Idles() int {
 	return n
 }
 
+type PoolInfo struct {
+	Address   string
+	IdleNum   int
+	ActiveNum int
+	Qps       int64
+}
+
 // 返回string，根据需要可能会修改返回值类型，如果info包含其他信息
-func (p *Pool) PoolInfo() string {
-	var IdleN, ActiveN int
+func (p *Pool) Info() []byte {
 	p.mu.RLock()
-	IdleN = p.IdleNum
-	ActiveN = p.ActiveNum
+	IdleN := p.IdleNum
+	ActiveN := p.ActiveNum
 	p.mu.RUnlock()
-	return "Address=" + p.Address + "    ActiveNum=" + strconv.Itoa(ActiveN) +
-		"    IdleNum=" + strconv.Itoa(IdleN) + "    ChannelLen=" + strconv.Itoa(len(p.ClientPool))
+
+	poolInfo := PoolInfo{
+		Address:   p.Address,
+		IdleNum:   IdleN,
+		ActiveNum: ActiveN,
+		Qps:       p.QPS(),
+	}
+
+	v, _ := json.Marshal(poolInfo)
+	return v
 }
 
 func (p *Pool) QPS() int64 {

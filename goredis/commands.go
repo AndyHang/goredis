@@ -3,7 +3,6 @@ package msgRedis
 // all return integer is int64
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -12,7 +11,7 @@ import (
 func (c *Conn) AUTH(password string) (bool, error) {
 	v, e := c.Call("AUTH", password)
 	if e != nil {
-		fmt.Println("AUTH failed:" + e.Error())
+		println("AUTH failed:" + e.Error())
 		return false, e
 	}
 

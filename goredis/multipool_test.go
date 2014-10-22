@@ -14,6 +14,38 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
+func TestMultiPush(t *testing.T) {
+	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991@1234567890"}
+	// addr := "10.16.15.121:9991@1234567890"
+	addr := "10.16.15.121:9731"
+	mp := NewMultiPool(addresses, 50, 9)
+	fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 60))
+	fmt.Println(mp.servers)
+
+	fmt.Println(mp.servers)
+
+	go func() {
+		for i := 0; i < 29; i++ {
+			fmt.Println(mp.Info())
+			time.Sleep(time.Second)
+		}
+	}()
+
+	// }
+	c := mp.PopByKey(addr)
+	if c == nil {
+		t.Error("c==nil....................")
+		return
+	}
+	for i := 0; i < 50; i++ {
+		go func() {
+			mp.Push(c)
+			time.Sleep(10 * time.Second)
+		}()
+	}
+	time.Sleep(30e9)
+}
+
 func TestMultiPop(t *testing.T) {
 	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991@1234567890"}
 	// addr := "10.16.15.121:9991@1234567890"
@@ -46,7 +78,7 @@ func TestMultiPop(t *testing.T) {
 			fmt.Println(c.SET("key", "value"))
 			mp.Push(c)
 		}()
-		time.Sleep(time.Duration(1000))
+		time.Sleep(time.Duration(5e9))
 	}
 }
 
@@ -61,22 +93,6 @@ func TestMultiPool(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}()
-
-	// for i := 0; i < 20; i++ {
-	// 	// time.Sleep(1000)
-	// 	c := mp.PopByAddr(addr)
-	// 	if c == nil {
-	// 		t.Error("c==nil....................")
-	// 		return
-	// 	}
-	// 	// c.PipeSend("set", strconv.Itoa(i), strconv.Itoa(i))
-	// 	// c.PipeExec()
-	// 	// fmt.Println("PING")
-	// 	c.CallN(3, "PING")
-	// 	time.Sleep(time.Second * 2)
-	// 	mp.PushByAddr(addr, c)
-
-	// }
 
 	var g sync.WaitGroup
 	for i := 0; i < 50; i++ {
