@@ -179,13 +179,15 @@ func (mp *MultiPool) Push(c *Conn) {
 }
 
 func (mp *MultiPool) Info() string {
-	var info string
 	mp.mu.RLock()
+	jsonSlice := make([]*PoolInfo, 0, len(mp.pools))
 	for _, p := range mp.pools {
-		info = info + string(p.Info()) + "\n"
+		jsonSlice = append(jsonSlice, p.Info())
 	}
 	mp.mu.RUnlock()
-	return info
+
+	responseJson, _ := json.Marshal(jsonSlice)
+	return string(responseJson)
 }
 
 // connection pool of only one redis server
@@ -363,21 +365,22 @@ type PoolInfo struct {
 }
 
 // 返回string，根据需要可能会修改返回值类型，如果info包含其他信息
-func (p *Pool) Info() []byte {
+func (p *Pool) Info() *PoolInfo {
 	p.mu.RLock()
 	IdleN := p.IdleNum
 	ActiveN := p.ActiveNum
 	p.mu.RUnlock()
 
-	poolInfo := PoolInfo{
+	poolInfo := &PoolInfo{
 		Address:   p.Address,
 		IdleNum:   IdleN,
 		ActiveNum: ActiveN,
 		Qps:       p.QPS(),
 	}
 
-	v, _ := json.Marshal(poolInfo)
-	return v
+	return poolInfo
+	// v, _ := json.Marshal(poolInfo)
+	// return v
 }
 
 func (p *Pool) QPS() int64 {
