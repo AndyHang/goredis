@@ -15,7 +15,7 @@ Arrays:			*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n
 A client sends to the Redis server a RESP Array consisting of just Bulk Strings.
 A Redis server replies to clients sending any valid RESP data type as reply.
 */
-package msgRedis
+package goredis
 
 // painc recover
 

@@ -1,4 +1,4 @@
-package msgRedis
+package goredis
 
 import (
 	"fmt"

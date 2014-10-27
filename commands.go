@@ -1,4 +1,4 @@
-package msgRedis
+package goredis
 
 // all return integer is int64
 import (
