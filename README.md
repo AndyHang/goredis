@@ -50,9 +50,12 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >		key := "myhashes"
 >		c = mp.PopByKey(key)
 >		mp.PushByKey(key, c)
+>		// mp.Push(c)
 >	PopByKey和PushByKey是对参数key进行hash，然后选出固定的redis。你可以使用自己的hash算法，具体实现在Sum函数中。
 >	AddPool函数，会在multiPool中新加入一个Pool，maxConnNum和maxIdleSeconds可以和初始化multiPool的时候不同，
+>	或者直接 mp.Push(c)  会自动去找到应该放入的Pool中
 >	注意：必须在init的时候按顺序添加不同参数的Pool，因为multiPool里面没有对pool slice加锁
+
 
 ####	Add a new pool into multiPool?
 >		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
