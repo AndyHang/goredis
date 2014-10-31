@@ -83,7 +83,7 @@ func TestWrite(t *testing.T) {
 
 	fmt.Println(c.SADD(key, args))
 	fmt.Println(c.SMEMBERS(key))
-	fmt.Println(c.DEL([]string{key}))
+	fmt.Println(c.DELMulti([]string{key}))
 
 	// test pipeline
 	c.PipeSend("SET", "a", "zyh")
@@ -108,7 +108,7 @@ func TestCommands(t *testing.T) {
 	fmt.Println("STRINGS.************************STRINGS**********************.STRINGS")
 	fmt.Println(c.SET("key", "value"))
 	fmt.Println(c.OBJECT("encoding", "key"))
-	fmt.Println(c.DEL([]string{"keysa"}))
+	fmt.Println(c.DEL("keys"))
 	fmt.Println(c.EXISTS("key"))
 	fmt.Println(c.EXPIRE("key", 1000))
 	fmt.Println(c.EXPIREAT("key", time.Now().Unix()+100))

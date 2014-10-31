@@ -76,6 +76,21 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 	}
 }
 
+func Connect(addr string, connectTimeout, readTimeout, writeTimeout time.Duration) (*Conn, error) {
+	addrPass := strings.Split(addr, ":")
+	address := ""
+	password := ""
+	if len(addrPass) == 3 {
+		address = addrPass[0] + ":" + addrPass[1]
+		password = addrPass[2]
+	} else if len(addrPass) == 2 {
+		address = addr
+	} else {
+		return nil, errors.New("invalid address pattarn")
+	}
+	return Dial(address, password, connectTimeout, readTimeout, writeTimeout, false, nil)
+}
+
 // connect with timeout
 func Dial(address, password string, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool) (*Conn, error) {
 	c, e := net.DialTimeout("tcp", address, connectTimeout)
@@ -87,7 +102,7 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 	}
 
 	if password != "" {
-		address = address + "@" + password
+		address = address + ":" + password
 	}
 	conn := NewConn(c.(*net.TCPConn), connectTimeout, readTimeout, writeTimeout, keepAlive, pool, address)
 	if password != "" {
@@ -123,7 +138,7 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 	var e error
 	for i := 0; i < retry; i++ {
 		ret, e = c.Call(command, args...)
-		if c.err != nil {
+		if c.err != nil && c.pool != nil {
 			c.pool.Push(c)
 			conn := c.pool.Pop()
 			if conn == nil {

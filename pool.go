@@ -23,13 +23,13 @@ type MultiPool struct {
 func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *MultiPool {
 	pools := make(map[string]*Pool, len(addresses))
 	for _, addr := range addresses {
-		addrPass := strings.Split(addr, "@")
-		if len(addrPass) == 2 {
+		addrPass := strings.Split(addr, ":")
+		if len(addrPass) == 3 {
 			// redis need auth
-			pools[addr] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
-		} else if len(addrPass) == 1 {
+			pools[addr] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleSeconds)
+		} else if len(addrPass) == 2 {
 			// redis do not need auth
-			pools[addr] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
+			pools[addr] = NewPool(addr, "", maxConnNum, maxIdleSeconds)
 		} else {
 			println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
 		}
@@ -42,16 +42,16 @@ func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *Mul
 }
 
 func (mp *MultiPool) AddPool(address string, maxConnNum int, maxIdleSeconds int64) bool {
-	addrPass := strings.Split(address, "@")
-	if len(addrPass) == 2 {
+	addrPass := strings.Split(address, ":")
+	if len(addrPass) == 3 {
 		// redis need auth
 		mp.mu.Lock()
-		mp.pools[address] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
+		mp.pools[address] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
-	} else if len(addrPass) == 1 {
+	} else if len(addrPass) == 2 {
 		// redis do not need auth
 		mp.mu.Lock()
-		mp.pools[address] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
+		mp.pools[address] = NewPool(address, "", maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
 		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
@@ -89,16 +89,16 @@ func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds
 		return false
 	}
 
-	addrPass := strings.Split(dst, "@")
-	if len(addrPass) == 2 {
+	addrPass := strings.Split(dst, ":")
+	if len(addrPass) == 3 {
 		// redis need auth
 		mp.mu.Lock()
-		mp.pools[dst] = NewPool(addrPass[0], addrPass[1], maxConnNum, maxIdleSeconds)
+		mp.pools[dst] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
-	} else if len(addrPass) == 1 {
+	} else if len(addrPass) == 2 {
 		// redis do not need auth
 		mp.mu.Lock()
-		mp.pools[dst] = NewPool(addrPass[0], "", maxConnNum, maxIdleSeconds)
+		mp.pools[dst] = NewPool(dst, "", maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
 		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")

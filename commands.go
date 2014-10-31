@@ -59,7 +59,15 @@ func (c *Conn) Info() ([]byte, error) {
 }
 
 /******************* keys commands *******************/
-func (c *Conn) DEL(keys []string) (int64, error) {
+func (c *Conn) DEL(key string) (int64, error) {
+	n, e := c.CallN(RetryTimes, "DEL", key)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
+func (c *Conn) DELMulti(keys []string) (int64, error) {
 	args := make([]interface{}, len(keys))
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
@@ -786,6 +794,26 @@ func (c *Conn) HGETALL(key string) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
+// 返回结果用map组织
+func (c *Conn) HGETALLMAP(key string) (map[string]string, error) {
+	v, e := c.HGETALL(key)
+	if e != nil {
+		return nil, e
+	}
+	result := make(map[string]string)
+	if len(v) > 0 && len(v)%2 == 0 {
+		for i := 0; i < len(v); {
+			if _, ok := v[i].([]byte); ok {
+				result[string(v[i].([]byte))] = string(v[i+1].([]byte))
+				i = i + 2
+			}
+		}
+	} else {
+		return result, ErrKeyNotExist
+	}
+	return result, nil
+}
+
 func (c *Conn) HINCRBY(key string, field string, increment int) (int64, error) {
 	n, e := c.CallN(RetryTimes, "HINCRBY", key, field, increment)
 	if e != nil {
@@ -1086,6 +1114,14 @@ func (c *Conn) RPUSHX(key, value string) (int64, error) {
 }
 
 /******************* sorted sets commands *******************/
+func (c *Conn) ZADDSpec(key string, score, value string) (int64, error) {
+	n, e := c.CallN(RetryTimes, "ZADD", key, score, value)
+	if e != nil {
+		return -1, e
+	}
+	return n.(int64), nil
+}
+
 func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) {
 	args := make([]interface{}, 1+2*len(keyScore))
 	args[0] = key
@@ -1097,7 +1133,7 @@ func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) 
 	}
 	n, e := c.CallN(RetryTimes, "ZADD", args...)
 	if e != nil {
-		return -1, nil
+		return -1, e
 	}
 	return n.(int64), nil
 }
@@ -1105,7 +1141,7 @@ func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) 
 func (c *Conn) ZCARD(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZCARD", key)
 	if e != nil {
-		return -1, nil
+		return -1, e
 	}
 	return n.(int64), nil
 }
@@ -1113,7 +1149,7 @@ func (c *Conn) ZCARD(key string) (int64, error) {
 func (c *Conn) ZCOUNT(key string, min, max float64) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZCOUNT", key, min, max)
 	if e != nil {
-		return -1, nil
+		return -1, e
 	}
 	return n.(int64), nil
 }
