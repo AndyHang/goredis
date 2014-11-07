@@ -1,4 +1,4 @@
-package goredis
+package msgRedis
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *Mul
 			// redis do not need auth
 			pools[addr] = NewPool(addr, "", maxConnNum, maxIdleSeconds)
 		} else {
-			println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+			println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123")
 		}
 	}
 
@@ -54,7 +54,7 @@ func (mp *MultiPool) AddPool(address string, maxConnNum int, maxIdleSeconds int6
 		mp.pools[address] = NewPool(address, "", maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
-		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123")
 		return false
 	}
 	mp.mu.Lock()
@@ -101,7 +101,7 @@ func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds
 		mp.pools[dst] = NewPool(dst, "", maxConnNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
-		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100@123")
+		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123")
 		return false
 	}
 	mp.mu.Lock()
@@ -225,7 +225,7 @@ func NewPool(address, password string, maxConnNum int, maxIdleSeconds int64) *Po
 
 // TODO: add timeout
 func (p *Pool) Pop() *Conn {
-	var waitSeconds = 5
+	var waitSeconds = 8
 	var c *Conn
 PopLoop:
 	for {
@@ -271,7 +271,7 @@ PopLoop:
 				}
 				waitSeconds--
 				println("[Pop] max wait 1s")
-				time.Sleep(1e9)
+				time.Sleep(5e8)
 				break
 			}
 			p.mu.RUnlock()
@@ -301,9 +301,6 @@ PopLoop:
 
 func (p *Pool) Push(c *Conn) {
 	if c == nil {
-		// p.mu.Lock()
-		// p.ActiveNum--
-		// p.mu.Unlock()
 		println("[Push] c == nil")
 		return
 	}
