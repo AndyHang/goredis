@@ -59,8 +59,8 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 ####	Add a new Call pormat with multiPool
 >		mp := NewMultiPool(addresses, maxConnNum, maxIdleSeconds)
 >		mp.CallOnce(address).SET("Key","Value")
-##	特别注意：通过CallOnce形式可以直接调用具体的redis命令，且不需要考虑是否要将连接放回
-##	使用者只需要关心程序逻辑即可，无需关心连接的管理
+####	特别注意：通过CallOnce形式可以直接调用具体的redis命令，且不需要考虑是否要将连接放回
+####	使用者只需要关心程序逻辑即可，无需关心连接的管理
 
 
 ####	Add a new pool into multiPool?
