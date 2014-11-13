@@ -56,6 +56,17 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 >	或者直接 mp.Push(c)  会自动去找到应该放入的Pool中
 >	注意：必须在init的时候按顺序添加不同参数的Pool，因为multiPool里面没有对pool slice加锁
 
+####	Add a new Call pormat with multiPool
+>		mp := NewMultiPool(addresses, maxConnNum, maxIdleSeconds)
+>		mp.CallOnce(address).SET("Key","Value")
+##	特别注意：通过CallOnce形式可以直接调用具体的redis命令，且不需要考虑是否要将连接放回
+##	使用者只需要关心程序逻辑即可，无需关心连接的管理
+
+
+####	Add a new pool into multiPool?
+>		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
+>	当有新的pool需要加入到pool中时，可以用该方法，但是如果你是通过对key进行hash，然后选择redis pool的话，会影响数据的一致性
+
 
 ####	Add a new pool into multiPool?
 >		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
