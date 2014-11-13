@@ -14,15 +14,53 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
+func TestMultiOnce(t *testing.T) {
+	addresses := []string{"10.16.15.121:9991:1234567890"}
+	addr := "10.16.15.121:9991:1234567890"
+	mp := NewMultiPool(addresses, 50, 20, 9)
+
+	go func() {
+		for {
+			fmt.Println("-----------" + mp.Info())
+		}
+	}()
+
+	time.Sleep(time.Second)
+
+	for i := 0; i < 100; i++ {
+		mp.CallOnce(addr).SET("a", "a")
+		mp.CallOnce(addr).GET("a")
+	}
+
+	time.Sleep(time.Second)
+
+	for i := 0; i < 100; i++ {
+		c := mp.PopByAddr(addr)
+		if c != nil {
+			c.SET("a", "a")
+		} else {
+			fmt.Println("c==nil")
+		}
+		mp.Push(c)
+	}
+
+	time.Sleep(10e9)
+}
+
 func TestMultiPush(t *testing.T) {
-	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991:1234567890"}
+	addresses := []string{"10.16.15.121:9931:1234567890", "10.16.15.121:9991:1234567890"}
 	addr := "10.16.15.121:9991:1234567890"
 	// addr := "10.16.15.121:9731"
-	mp := NewMultiPool(addresses, 50, 9)
-	fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 60))
-	fmt.Println(mp.servers)
-	fmt.Println(mp.pools)
-	fmt.Println(mp.Info())
+	mp := NewMultiPool(addresses, 50, 20, 9)
+
+	c := mp.PopByAddr(addr)
+	time.Sleep(1 * time.Second)
+	mp.Push(c)
+
+	// fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 60))
+	// fmt.Println(mp.servers)
+	// fmt.Println(mp.pools)
+	// fmt.Println(mp.Info())
 	// go func() {
 	// 	for i := 0; i < 29; i++ {
 	// 		fmt.Println(mp.Info())
@@ -30,20 +68,13 @@ func TestMultiPush(t *testing.T) {
 	// 	}
 	// }()
 
+	// for i := 0; i < 50; i++ {
+	// 	go func() {
+	// 		c := mp.PopByAddr(addr)
+	// 		time.Sleep(1 * time.Second)
+	// 		mp.Push(c)
+	// 	}()
 	// }
-	// c := mp.PopByKey("addr")
-	c := mp.PopByAddr(addr)
-	if c == nil {
-		t.Error("c==nil....................")
-		return
-	}
-	fmt.Println(c.Address)
-	for i := 0; i < 50; i++ {
-		go func() {
-			mp.Push(c)
-			time.Sleep(1 * time.Second)
-		}()
-	}
 	time.Sleep(30e9)
 }
 
@@ -51,16 +82,16 @@ func TestMultiPop(t *testing.T) {
 	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991:1234567890"}
 	// addr := "10.16.15.121:9991@1234567890"
 	addr := "10.16.15.121:9731"
-	mp := NewMultiPool(addresses, 50, 9)
-	fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 60))
+	mp := NewMultiPool(addresses, 50, 20, 9)
+	fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 20, 60))
 	fmt.Println(mp.servers)
 	go func() {
 		for i := 0; i < 29; i++ {
 			fmt.Println(mp.Info())
 			// time.Sleep(time.Second)
-			mp.AddPool("10.16.15.121:9901", 10, 60)
+			mp.AddPool("10.16.15.121:9901", 10, 10, 60)
 			// mp.DelPool("10.16.15.121:9901")
-			mp.ReplacePool("10.16.15.121:9901", "10.16.15.121:9801", 20, 8)
+			mp.ReplacePool("10.16.15.121:9901", "10.16.15.121:9801", 20, 10, 8)
 		}
 	}()
 
@@ -83,8 +114,8 @@ func TestMultiPop(t *testing.T) {
 func TestMultiPool(t *testing.T) {
 	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991:1234567890"}
 	addr := "10.16.15.121:9991:1234567890"
-	mp := NewMultiPool(addresses, 20, 20)
-	fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 60))
+	mp := NewMultiPool(addresses, 20, 10, 20)
+	fmt.Println(mp.AddPool("10.16.15.121:9901", 10, 10, 60))
 	go func() {
 		for i := 0; i < 29; i++ {
 			mp.Info()
@@ -120,7 +151,7 @@ func TestMultiPool(t *testing.T) {
 func TestPushAndPop(t *testing.T) {
 	addresses := []string{"10.16.15.121:9731", "10.16.15.121:9991:1234567890"}
 	addr := "10.16.15.121:9991:1234567890"
-	mp := NewMultiPool(addresses, 20, 20)
+	mp := NewMultiPool(addresses, 20, 10, 20)
 
 	start := time.Now()
 	for i := 0; i < 10000; i++ {

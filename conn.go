@@ -38,6 +38,7 @@ var (
 	ErrKeyNotExist   = errors.New(CommonErrPrefix + "key not exist")
 	ErrBadArgs       = errors.New(CommonErrPrefix + "request args invalid")
 	ErrEmptyDB       = errors.New(CommonErrPrefix + "empty db")
+	ErrResponseType  = errors.New(CommonErrPrefix + "response type error")
 
 	CommonErrPrefix = "CommonError:"
 )
@@ -58,6 +59,7 @@ type Conn struct {
 	writeTimeout   time.Duration
 	pool           *Pool
 	err            error // 表示该条链接是否已经出错
+	isOnce         bool  // 用于判断每次调用后，是否自动放回连接池 ，true自动放回无需开发者显示操作，默认为false
 }
 
 func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool, Address string) *Conn {
@@ -73,6 +75,7 @@ func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.D
 		writeTimeout:   writeTimeout,
 		pool:           pool,
 		Address:        Address,
+		isOnce:         false,
 	}
 }
 
@@ -125,6 +128,8 @@ func (c *Conn) Copy(conn *Conn) {
 	c.readTimeout = conn.readTimeout
 	c.writeTimeout = conn.writeTimeout
 	c.pool = conn.pool
+	c.isOnce = conn.isOnce
+	c.isIdle = conn.isIdle
 }
 
 func (c *Conn) Close() {
@@ -134,10 +139,14 @@ func (c *Conn) Close() {
 }
 
 func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{}, error) {
+	if c.err != nil {
+		return nil, c.err
+	}
 	var ret interface{}
 	var e error
 	for i := 0; i < retry; i++ {
 		ret, e = c.Call(command, args...)
+		// 如果isOnce参数为true，会在Call函数中放回
 		if c.err != nil && c.pool != nil {
 			c.pool.Push(c)
 			conn := c.pool.Pop()
@@ -154,6 +163,22 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 
 // call redis command with request => response model
 func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
+	// 如果连接已经被标记出错，直接返回
+	// 应用场景，OnceConn没有获取到连接，会新建一个err非nil的Conn结构
+	if c.err != nil {
+		return nil, c.err
+	}
+
+	// 需要自动放回
+	if c.isOnce {
+		c.isOnce = false
+		defer func() {
+			if c.pool != nil {
+				c.pool.Push(c)
+			}
+		}()
+	}
+
 	c.lastActiveTime = time.Now().Unix()
 	// start := time.Now()
 	if c.pool != nil {
@@ -164,6 +189,10 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	var e error
 	// 如果链接网络出错，标记该条链接已出错，并立刻关闭该条链接
 	defer func() {
+		if e != nil {
+			Debug(command+" err:"+e.Error(), c.Address)
+		}
+
 		if e != nil && !strings.Contains(e.Error(), CommonErrPrefix) {
 			c.err = e
 			c.Close()

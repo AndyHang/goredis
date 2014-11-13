@@ -1,4 +1,4 @@
-package msgRedis
+package goredis
 
 import (
 	"encoding/json"
@@ -7,8 +7,11 @@ import (
 	"time"
 )
 
+var debug = true
+
 const (
 	DefaultMaxConnNumber  = 50
+	DefaultMaxIdleNumber  = 25
 	DefaultMaxIdleSeconds = 28
 )
 
@@ -20,18 +23,18 @@ type MultiPool struct {
 }
 
 //
-func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *MultiPool {
+func NewMultiPool(addresses []string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) *MultiPool {
 	pools := make(map[string]*Pool, len(addresses))
 	for _, addr := range addresses {
 		addrPass := strings.Split(addr, ":")
 		if len(addrPass) == 3 {
 			// redis need auth
-			pools[addr] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleSeconds)
+			pools[addr] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleNum, maxIdleSeconds)
 		} else if len(addrPass) == 2 {
 			// redis do not need auth
-			pools[addr] = NewPool(addr, "", maxConnNum, maxIdleSeconds)
+			pools[addr] = NewPool(addr, "", maxConnNum, maxIdleNum, maxIdleSeconds)
 		} else {
-			println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123")
+			Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", addr)
 		}
 	}
 
@@ -41,20 +44,20 @@ func NewMultiPool(addresses []string, maxConnNum int, maxIdleSeconds int64) *Mul
 	}
 }
 
-func (mp *MultiPool) AddPool(address string, maxConnNum int, maxIdleSeconds int64) bool {
+func (mp *MultiPool) AddPool(address string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) bool {
 	addrPass := strings.Split(address, ":")
 	if len(addrPass) == 3 {
 		// redis need auth
 		mp.mu.Lock()
-		mp.pools[address] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleSeconds)
+		mp.pools[address] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else if len(addrPass) == 2 {
 		// redis do not need auth
 		mp.mu.Lock()
-		mp.pools[address] = NewPool(address, "", maxConnNum, maxIdleSeconds)
+		mp.pools[address] = NewPool(address, "", maxConnNum, maxIdleNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
-		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123")
+		Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", address)
 		return false
 	}
 	mp.mu.Lock()
@@ -79,13 +82,13 @@ func (mp *MultiPool) DelPool(address string) {
 	mp.mu.Unlock()
 }
 
-func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds int64) bool {
+func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) bool {
 	mp.mu.RLock()
 	_, ok := mp.pools[src]
 	delete(mp.pools, src)
 	mp.mu.RUnlock()
 	if !ok {
-		println("src=" + src + " not exists in the pool")
+		Debug("src not exists in the pool", src)
 		return false
 	}
 
@@ -93,15 +96,15 @@ func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum int, maxIdleSeconds
 	if len(addrPass) == 3 {
 		// redis need auth
 		mp.mu.Lock()
-		mp.pools[dst] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleSeconds)
+		mp.pools[dst] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else if len(addrPass) == 2 {
 		// redis do not need auth
 		mp.mu.Lock()
-		mp.pools[dst] = NewPool(dst, "", maxConnNum, maxIdleSeconds)
+		mp.pools[dst] = NewPool(dst, "", maxConnNum, maxIdleNum, maxIdleSeconds)
 		mp.mu.Unlock()
 	} else {
-		println("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123")
+		Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", dst)
 		return false
 	}
 	mp.mu.Lock()
@@ -120,7 +123,7 @@ func (mp *MultiPool) PopByAddr(addr string) *Conn {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		println("[PopByAddr] invalid address:" + addr)
+		Debug("[PopByAddr] invalid", addr)
 		return nil
 	}
 	return pool.Pop()
@@ -131,7 +134,7 @@ func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		println("[PushByAddr] invalid address:" + addr)
+		Debug("[PushByAddr] invalid", addr)
 		return
 	}
 	pool.Push(c)
@@ -145,7 +148,7 @@ func (mp *MultiPool) PopByKey(key string) *Conn {
 	mp.mu.RUnlock()
 
 	if !ok {
-		println("[PopByKey] invalid address:" + addr)
+		Debug("[PopByKey] invalid", addr)
 		return nil
 	}
 	return pool.Pop()
@@ -157,7 +160,7 @@ func (mp *MultiPool) PushByKey(key string, c *Conn) {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		println("[PushByKey] invalid address:" + addr)
+		Debug("[PushByKey] invalid", addr)
 		return
 	}
 	pool.Push(c)
@@ -172,19 +175,29 @@ func (mp *MultiPool) Push(c *Conn) {
 	pool, ok := mp.pools[addr]
 	mp.mu.RUnlock()
 	if !ok {
-		println("[Push] invalid address:" + addr)
+		Debug("[Push] invalid", addr)
 		return
 	}
 	pool.Push(c)
 }
 
 func (mp *MultiPool) Info() string {
+	var jsonLock sync.Mutex
+	var wait sync.WaitGroup
 	mp.mu.RLock()
 	jsonSlice := make([]*PoolInfo, 0, len(mp.pools))
 	for _, p := range mp.pools {
-		jsonSlice = append(jsonSlice, p.Info())
+		wait.Add(1)
+		go func(p *Pool) {
+			info := p.Info()
+			jsonLock.Lock()
+			jsonSlice = append(jsonSlice, info)
+			jsonLock.Unlock()
+			wait.Done()
+		}(p)
 	}
 	mp.mu.RUnlock()
+	wait.Wait()
 
 	responseJson, _ := json.Marshal(jsonSlice)
 	return string(responseJson)
@@ -197,6 +210,8 @@ type Pool struct {
 	IdleNum        int
 	ActiveNum      int
 	MaxConnNum     int
+	MaxIdleNum     int
+	CreateNum      int
 	MaxIdleSeconds int64
 
 	ClientPool chan *Conn
@@ -210,13 +225,15 @@ type Pool struct {
 	CallConsume map[string]int // 命令消耗时长
 }
 
-func NewPool(address, password string, maxConnNum int, maxIdleSeconds int64) *Pool {
+func NewPool(address, password string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) *Pool {
 	return &Pool{
 		Address:        address,
 		Password:       password,
 		IdleNum:        0,
 		ActiveNum:      0,
+		CreateNum:      0,
 		MaxConnNum:     maxConnNum,
+		MaxIdleNum:     maxIdleNum,
 		MaxIdleSeconds: maxIdleSeconds,
 		ClientPool:     make(chan *Conn, maxConnNum),
 		ScriptMap:      make(map[string]string, 1),
@@ -225,7 +242,7 @@ func NewPool(address, password string, maxConnNum int, maxIdleSeconds int64) *Po
 
 // TODO: add timeout
 func (p *Pool) Pop() *Conn {
-	var waitSeconds = 8
+	var waitSeconds = 50
 	var c *Conn
 PopLoop:
 	for {
@@ -248,7 +265,6 @@ PopLoop:
 				p.mu.Lock()
 				p.IdleNum--
 				p.mu.Unlock()
-				println("[Pop] lastActiveTime exceed maxIdleSeconds")
 				break
 			}
 			// 标记当前连接为正在使用
@@ -265,13 +281,13 @@ PopLoop:
 			p.mu.RLock()
 			if p.IdleNum+p.ActiveNum >= p.MaxConnNum {
 				p.mu.RUnlock()
-				println("waiting................")
 				if waitSeconds <= 0 {
+					Debug("waiting exceed time get conn failed ", p.Address)
 					break PopLoop
 				}
 				waitSeconds--
-				println("[Pop] max wait 1s")
-				time.Sleep(5e8)
+				// Debug("[Pop] max wait 1s ", p.Address)
+				time.Sleep(1e8)
 				break
 			}
 			p.mu.RUnlock()
@@ -279,13 +295,15 @@ PopLoop:
 			//
 			p.mu.Lock()
 			p.ActiveNum++
+			p.CreateNum++
 			p.mu.Unlock()
 			c, e := Dial(p.Address, p.Password, ConnectTimeout, ReadTimeout, WriteTimeout, true, p)
 			if e != nil {
 				p.mu.Lock()
 				p.ActiveNum--
+				p.CreateNum--
 				p.mu.Unlock()
-				println(e.Error())
+				Debug(e.Error(), p.Address)
 				break PopLoop
 			}
 			// 标记当前连接为正在使用
@@ -301,7 +319,7 @@ PopLoop:
 
 func (p *Pool) Push(c *Conn) {
 	if c == nil {
-		println("[Push] c == nil")
+		Debug("[Push] c == nil", p.Address)
 		return
 	}
 
@@ -316,10 +334,21 @@ func (p *Pool) Push(c *Conn) {
 
 	// 如果连接网络出错，直接丢掉
 	if c.err != nil {
-		c.Close()
 		p.mu.Lock()
 		p.ActiveNum--
 		p.mu.Unlock()
+		c.Close()
+		return
+	}
+
+	p.mu.RLock()
+	idleNum := p.IdleNum
+	p.mu.RUnlock()
+	if idleNum > p.MaxIdleNum {
+		p.mu.Lock()
+		p.ActiveNum--
+		p.mu.Unlock()
+		c.Close()
 		return
 	}
 
@@ -330,10 +359,10 @@ func (p *Pool) Push(c *Conn) {
 		p.ActiveNum--
 		p.mu.Unlock()
 	default:
-		c.Close()
 		p.mu.Lock()
 		p.ActiveNum--
 		p.mu.Unlock()
+		c.Close()
 		// discard
 	}
 }
@@ -358,6 +387,7 @@ type PoolInfo struct {
 	Address   string
 	IdleNum   int
 	ActiveNum int
+	CreateNum int
 	Qps       int64
 }
 
@@ -366,13 +396,16 @@ func (p *Pool) Info() *PoolInfo {
 	p.mu.RLock()
 	IdleN := p.IdleNum
 	ActiveN := p.ActiveNum
+	CreateN := p.CreateNum
 	p.mu.RUnlock()
 
+	qps := p.QPS()
 	poolInfo := &PoolInfo{
 		Address:   p.Address,
 		IdleNum:   IdleN,
 		ActiveNum: ActiveN,
-		Qps:       p.QPS(),
+		CreateNum: CreateN,
+		Qps:       qps,
 	}
 
 	return poolInfo
@@ -446,4 +479,15 @@ func Sum(key string) int {
 	hash ^= (hash >> 11)
 	hash += (hash << 15)
 	return int(hash)
+}
+
+// 当前时间
+func Now() string {
+	return time.Now().Format("2006-01-02 15:04:05 ")
+}
+
+func Debug(info, address string) {
+	if debug {
+		println(Now() + info + "|addr=" + address)
+	}
 }

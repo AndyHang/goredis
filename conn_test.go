@@ -6,17 +6,22 @@ import (
 	"time"
 )
 
-func TestZRANGE(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "", 10, 10)
+func TestSigle(t *testing.T) {
+	p := NewPool("10.16.15.121:9731", "", 10, 10, 10)
 	c := p.Pop()
-	fmt.Println(c.EXISTS("keynoexist"))
-	fmt.Println(c.ZRANGE("keynoexist", -40, -1, false))
-}
+	// fmt.Println(c.CallN(2, "HMGET", "a", "a"))
 
-func TestCallN(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "", 10, 10)
-	c := p.Pop()
-	fmt.Println(c.CallN(2, "HMGET", "a", "a"))
+	fmt.Println(c.CallN(2, "HSET", "zkey1106", "tagList", "sss"))
+
+	kv1 := make(map[string]interface{})
+	kv1["key2"] = "keys2"
+	kv1["key3"] = 1234
+
+	key := "asfset"
+
+	fmt.Println(c.HSET(key, "field", "value"))
+	// fmt.Println(c.HMGET(key+"adf", []string{"sfjk", "noexists"}))
+	// fmt.Println(c.HGETALLMAP(key))
 }
 
 func TestPipeSmallBuffer(t *testing.T) {
@@ -34,7 +39,7 @@ func TestPipeSmallBuffer(t *testing.T) {
 }
 
 func TestPoolNoAuth(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "", 10, 10)
+	p := NewPool("10.16.15.121:9731", "", 10, 10, 10)
 	connSlice := make([]*Conn, 0, 25)
 	for i := 0; i < 5; i++ {
 		fmt.Println("Active=", p.Actives())
@@ -52,7 +57,7 @@ func TestPoolNoAuth(t *testing.T) {
 }
 
 func TestPoolAuth(t *testing.T) {
-	p := NewPool("10.16.15.121:9991", "1234567890", 10, 10)
+	p := NewPool("10.16.15.121:9991", "1234567890", 10, 10, 10)
 	fmt.Println(p.Actives())
 	fmt.Println(p.Idles())
 	c := p.Pop()
@@ -83,7 +88,7 @@ func TestWrite(t *testing.T) {
 
 	fmt.Println(c.SADD(key, args))
 	fmt.Println(c.SMEMBERS(key))
-	fmt.Println(c.DELMulti([]string{key}))
+	fmt.Println(c.DEL(key))
 
 	// test pipeline
 	c.PipeSend("SET", "a", "zyh")
@@ -105,10 +110,18 @@ func TestCommands(t *testing.T) {
 	}
 	defer c.conn.Close()
 
+	fmt.Println("SETS.**************************SETS*********************.SETS")
+	keyz := "setsZYH"
+	key1z := "setsZYH1"
+	fmt.Println(c.SADD(keyz, []string{"a", "b", "c"}))
+	fmt.Println(c.SADD(key1z, []string{"c", "d", "e"}))
+	fmt.Println(c.SREM(keyz, []string{"a", "b", "c", "z"}))
+	return
+
 	fmt.Println("STRINGS.************************STRINGS**********************.STRINGS")
 	fmt.Println(c.SET("key", "value"))
 	fmt.Println(c.OBJECT("encoding", "key"))
-	fmt.Println(c.DEL("keys"))
+	fmt.Println(c.DEL("keysa"))
 	fmt.Println(c.EXISTS("key"))
 	fmt.Println(c.EXPIRE("key", 1000))
 	fmt.Println(c.EXPIREAT("key", time.Now().Unix()+100))
@@ -252,7 +265,7 @@ func TestCommands(t *testing.T) {
 }
 
 func TestQPS(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "", 10, 10)
+	p := NewPool("10.16.15.121:9731", "", 10, 10, 10)
 	for i := 0; i < 50; i++ {
 		c := p.Pop()
 		if c != nil {
@@ -325,7 +338,7 @@ func call(c *Conn) {
 }
 
 func TestScript(t *testing.T) {
-	p := NewPool("10.16.15.121:9731", "", 10, 10)
+	p := NewPool("10.16.15.121:9731", "", 10, 10, 10)
 	c := p.Pop()
 	if c == nil {
 		return
