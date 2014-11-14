@@ -28,8 +28,7 @@ func TestMultiOnce(t *testing.T) {
 	time.Sleep(time.Second)
 
 	for i := 0; i < 100; i++ {
-		mp.CallOnce(addr).SET("a", "a")
-		mp.CallOnce(addr).GET("a")
+		mp.Call(addr).SET("a", "a")
 	}
 
 	time.Sleep(time.Second)

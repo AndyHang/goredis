@@ -205,13 +205,20 @@ func (mp *MultiPool) Info() string {
 
 // connection pool of only one redis server
 type Pool struct {
-	Address        string
-	Password       string
-	IdleNum        int
-	ActiveNum      int
-	MaxConnNum     int
-	MaxIdleNum     int
-	CreateNum      int
+	Address  string
+	Password string
+
+	// 统计信息
+	IdleNum         int
+	ActiveNum       int
+	MaxConnNum      int
+	MaxIdleNum      int
+	CreateNum       int
+	CreateFailedNum int
+	WaitTimeoutNum  int
+	PingErrNum      int
+	CallNetErrNum   int
+
 	MaxIdleSeconds int64
 
 	ClientPool chan *Conn
@@ -282,11 +289,13 @@ PopLoop:
 			if p.IdleNum+p.ActiveNum >= p.MaxConnNum {
 				p.mu.RUnlock()
 				if waitSeconds <= 0 {
+					p.mu.Lock()
+					p.WaitTimeoutNum++
+					p.mu.Unlock()
 					Debug("waiting exceed time get conn failed ", p.Address)
 					break PopLoop
 				}
 				waitSeconds--
-				// Debug("[Pop] max wait 1s ", p.Address)
 				time.Sleep(1e8)
 				break
 			}
@@ -301,7 +310,7 @@ PopLoop:
 			if e != nil {
 				p.mu.Lock()
 				p.ActiveNum--
-				p.CreateNum--
+				p.CreateFailedNum++
 				p.mu.Unlock()
 				Debug(e.Error(), p.Address)
 				break PopLoop
@@ -384,11 +393,15 @@ func (p *Pool) Idles() int {
 }
 
 type PoolInfo struct {
-	Address   string
-	IdleNum   int
-	ActiveNum int
-	CreateNum int
-	Qps       int64
+	Address         string
+	IdleNum         int
+	ActiveNum       int
+	CreateNum       int
+	TimeoutNum      int
+	CreateFailedNum int
+	CallNetErrNum   int
+	PingErrNum      int
+	Qps             int64
 }
 
 // 返回string，根据需要可能会修改返回值类型，如果info包含其他信息
@@ -397,15 +410,23 @@ func (p *Pool) Info() *PoolInfo {
 	IdleN := p.IdleNum
 	ActiveN := p.ActiveNum
 	CreateN := p.CreateNum
+	TimeoutN := p.WaitTimeoutNum
+	CreateFailedN := p.CreateFailedNum
+	CallNetErrN := p.CallNetErrNum
+	PingErrN := p.PingErrNum
 	p.mu.RUnlock()
 
 	qps := p.QPS()
 	poolInfo := &PoolInfo{
-		Address:   p.Address,
-		IdleNum:   IdleN,
-		ActiveNum: ActiveN,
-		CreateNum: CreateN,
-		Qps:       qps,
+		Address:         p.Address,
+		IdleNum:         IdleN,
+		ActiveNum:       ActiveN,
+		CreateNum:       CreateN,
+		TimeoutNum:      TimeoutN,
+		CreateFailedNum: CreateFailedN,
+		CallNetErrNum:   CallNetErrN,
+		PingErrNum:      PingErrN,
+		Qps:             qps,
 	}
 
 	return poolInfo

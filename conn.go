@@ -190,10 +190,23 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	// 如果链接网络出错，标记该条链接已出错，并立刻关闭该条链接
 	defer func() {
 		if e != nil {
-			Debug(command+" err:"+e.Error(), c.Address)
+			if command != "PING" {
+				Debug(command+" err:"+e.Error(), c.Address)
+			}
 		}
 
 		if e != nil && !strings.Contains(e.Error(), CommonErrPrefix) {
+			if c.pool != nil {
+				if command != "PING" {
+					c.pool.mu.Lock()
+					c.pool.CallNetErrNum++
+					c.pool.mu.Unlock()
+				} else {
+					c.pool.mu.Lock()
+					c.pool.PingErrNum++
+					c.pool.mu.Unlock()
+				}
+			}
 			c.err = e
 			c.Close()
 		}

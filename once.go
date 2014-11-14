@@ -1,4 +1,4 @@
-package msgRedis
+package goredis
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ type OnceConn struct {
 	*Conn
 }
 
-func (mp *MultiPool) CallOnce(address string) *OnceConn {
+func (mp *MultiPool) Call(address string) *OnceConn {
 	oc := &OnceConn{}
 	c := mp.PopByAddr(address)
 	if c == nil {
@@ -18,5 +18,4 @@ func (mp *MultiPool) CallOnce(address string) *OnceConn {
 	oc.Conn = c
 	oc.Conn.isOnce = true
 	return oc
-
 }

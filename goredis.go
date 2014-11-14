@@ -16,3 +16,13 @@ A client sends to the Redis server a RESP Array consisting of just Bulk Strings.
 A Redis server replies to clients sending any valid RESP data type as reply.
 */
 package goredis
+
+// painc recover
+
+// 1 网络错误与普通错误的区分
+// 2 redis命令参数，统一为一个结构体？
+// 3 nil与空的处理
+// 4 可能出现panic的处理
+// 5 读到了错误字符，会不会有没有读完的数据
+// 6 内嵌哈希算法 ok
+// 7
