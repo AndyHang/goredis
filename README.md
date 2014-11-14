@@ -62,6 +62,9 @@ golang redis client, bufferd connection, connection pool, support all redis comm
 ####	特别注意：通过CallOnce形式可以直接调用具体的redis命令，且不需要考虑是否要将连接放回
 ####	使用者只需要关心程序逻辑即可，无需关心连接的管理
 
+####	Get RedisPool INfo?
+>		mp.Info() // 通过该接口可以得到关于连接池的相关信息，有助于你对程序运行状况的了解	
+>			  // idle，active，qps，create，createFailed，等等信息		
 
 ####	Add a new pool into multiPool?
 >		mp.AddPool("127.0.0.1:9988", maxConnNum+10, maxIdleSeconds+10)
