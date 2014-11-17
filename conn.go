@@ -1,3 +1,4 @@
+// Copyright 2014 zhaiyuhang. All rights reserved.
 package goredis
 
 import (
@@ -142,6 +143,8 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 	if c.err != nil {
 		return nil, c.err
 	}
+	// 记录下当前连接是否需要调用完自动放回
+	isOnce := c.isOnce
 	var ret interface{}
 	var e error
 	for i := 0; i < retry; i++ {
@@ -154,6 +157,10 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 				return nil, e
 			}
 			c.Copy(conn)
+			// 如果CallN是通过Once调用，第一次Call失败，isOnce会被置为false
+			// 此时从pool中再	取一条conn（pool中的isOnce是false）
+			// 再调用的时候就不会被自动放回，造成泄漏
+			c.isOnce = isOnce
 			continue
 		}
 		break

@@ -1,3 +1,4 @@
+// Copyright 2014 zhaiyuhang. All rights reserved.
 package goredis
 
 import (

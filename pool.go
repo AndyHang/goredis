@@ -1,3 +1,4 @@
+// Copyright 2014 zhaiyuhang. All rights reserved.
 package goredis
 
 import (
@@ -296,7 +297,7 @@ PopLoop:
 					break PopLoop
 				}
 				waitSeconds--
-				time.Sleep(1e8)
+				time.Sleep(2e8)
 				break
 			}
 			p.mu.RUnlock()

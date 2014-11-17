@@ -1,4 +1,5 @@
-package goredis
+// Copyright 2014 zhaiyuhang. All rights reserved.
+package msgRedis
 
 import (
 	"errors"
