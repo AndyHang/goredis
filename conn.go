@@ -131,6 +131,7 @@ func (c *Conn) Copy(conn *Conn) {
 	c.pool = conn.pool
 	c.isOnce = conn.isOnce
 	c.isIdle = conn.isIdle
+	c.err = nil
 }
 
 func (c *Conn) Close() {
@@ -149,9 +150,12 @@ func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{
 	var e error
 	for i := 0; i < retry; i++ {
 		ret, e = c.Call(command, args...)
-		// 如果isOnce参数为true，会在Call函数中放回
-		if c.err != nil && c.pool != nil {
-			c.pool.Push(c)
+		if c.err != nil && c.pool != nil && i+1 < retry {
+			// 如果isOnce参数为true，会在Call函数中放回
+			// isOnce为true时，说明在call函数中已经被放进了连接池内
+			if !isOnce {
+				c.pool.Push(c)
+			}
 			conn := c.pool.Pop()
 			if conn == nil {
 				return nil, e
@@ -176,16 +180,6 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 		return nil, c.err
 	}
 
-	// 需要自动放回
-	if c.isOnce {
-		c.isOnce = false
-		defer func() {
-			if c.pool != nil {
-				c.pool.Push(c)
-			}
-		}()
-	}
-
 	c.lastActiveTime = time.Now().Unix()
 	// start := time.Now()
 	if c.pool != nil {
@@ -196,12 +190,6 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 	var e error
 	// 如果链接网络出错，标记该条链接已出错，并立刻关闭该条链接
 	defer func() {
-		if e != nil {
-			if command != "PING" {
-				Debug(command+" err:"+e.Error(), c.Address)
-			}
-		}
-
 		if e != nil && !strings.Contains(e.Error(), CommonErrPrefix) {
 			if c.pool != nil {
 				if command != "PING" {
@@ -215,8 +203,16 @@ func (c *Conn) Call(command string, args ...interface{}) (interface{}, error) {
 				}
 			}
 			c.err = e
-			c.Close()
 		}
+
+		// 需要自动放回
+		if c.isOnce {
+			c.isOnce = false
+			if c.pool != nil {
+				c.pool.Push(c)
+			}
+		}
+
 	}()
 
 	if c.writeTimeout > 0 {
